@@ -1,7 +1,7 @@
-package Team;
+package Robots;
 
-import Team.Communication.*;
-import Team.Helpers.*;
+import Communication.*;
+import Helpers.*;
 import robocode.*;
 import java.awt.*;
 import java.io.IOException;

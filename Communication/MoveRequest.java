@@ -1,6 +1,6 @@
-package Team.Communication;
+package Communication;
 
-import Team.Helpers.Location;
+import Helpers.Location;
 import java.io.Serializable;
 
 public class MoveRequest implements Serializable {

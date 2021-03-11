@@ -1,7 +1,7 @@
-package Team.Communication;
+package Communication;
 
 import robocode.ScannedRobotEvent;
-import Team.Helpers.Location;
+import Helpers.Location;
 import java.io.Serializable;
 
 /**

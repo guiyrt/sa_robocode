@@ -1,7 +1,6 @@
-package Team.Helpers;
+package Helpers;
 
 import java.awt.*;
-import java.util.List;
 
 /**
  * Static class implementation to declare methods used in onPaint

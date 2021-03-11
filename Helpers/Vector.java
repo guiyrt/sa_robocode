@@ -1,4 +1,4 @@
-package Team.Helpers;
+package Helpers;
 
 import java.io.Serializable;
 

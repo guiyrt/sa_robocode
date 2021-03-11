@@ -1,4 +1,4 @@
-package Team.Communication;
+package Communication;
 
 import java.io.Serializable;
 

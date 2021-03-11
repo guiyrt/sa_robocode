@@ -1,4 +1,4 @@
-package Team.Helpers;
+package Helpers;
 
 /**
  * Static class implementation to deal with arena angle and coordinates calculations

@@ -1,8 +1,8 @@
-package Team.Communication;
+package Communication;
 
-import Team.Helpers.Location;
-import Team.Helpers.ArenaCalculations;
-import Team.Helpers.Vector;
+import Helpers.Location;
+import Helpers.ArenaCalculations;
+import Helpers.Vector;
 import robocode.Bullet;
 import java.io.Serializable;
 
