@@ -1,7 +1,7 @@
-package robots;
+package sa_robocode.robots;
 
-import Communication.*;
-import Helpers.*;
+import sa_robocode.Communication.*;
+import sa_robocode.Helpers.*;
 import robocode.*;
 import java.awt.*;
 import java.io.IOException;
@@ -36,8 +36,12 @@ public class Private extends TeamRobot {
 	public void run() {
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_GREEN, COPPER_BULLET, BEAM_BLUE);
 
-		while (true) {
-			turnRadarRight(360);
+		if (getName().contains("2")) {
+			goToLocation(new Location(50.0,50.0));
+			System.out.println("50 50");
+			goToLocation(new Location(750.0,550.0));
+			System.out.println("750 550");
+			requestFireToLocation(1.0, new Location(0.0, 0.0));
 		}
 	}
 
@@ -46,13 +50,7 @@ public class Private extends TeamRobot {
 	 * @param g2d Graphics2D instance from robocode instance
 	 */
 	public void onPaint(Graphics2D g2d) {
-		for(List<ScanInfo> l: enemiesTracking.values()) {
-			Painter.drawCircleAround(g2d, Color.red, l.get(0).getLocation(), 50);
-		}
 
-		for(ScanInfo si: teammatesTracking.values()) {
-			Painter.drawCircleAround(g2d, Color.green, si.getLocation(), 50);
-		}
 	}
 
 	/**
@@ -224,7 +222,7 @@ public class Private extends TeamRobot {
 	 * @param sre Resulting ScannedRobotEvent instance
 	 */
 	public void onScannedRobot(ScannedRobotEvent sre) {
-		Location detectedRobotLocation = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), getHeading() + sre.getBearing(), sre.getDistance());
+		Location detectedRobotLocation = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), getRadarHeading() + sre.getBearing(), sre.getDistance());
 		ScanInfo si = new ScanInfo(detectedRobotLocation, sre);
 
 		sendMessageToTeam(new Message(si));

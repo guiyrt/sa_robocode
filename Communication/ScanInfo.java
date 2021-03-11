@@ -1,7 +1,7 @@
-package Communication;
+package sa_robocode.Communication;
 
 import robocode.ScannedRobotEvent;
-import Helpers.Location;
+import sa_robocode.Helpers.Location;
 import java.io.Serializable;
 
 /**
