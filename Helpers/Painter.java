@@ -1,4 +1,4 @@
-package sa_robocode.Helpers;
+package Helpers;
 
 import java.awt.*;
 

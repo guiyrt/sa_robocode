@@ -1,0 +1,7 @@
+#Robocode robot team
+#Thu Mar 11 17:41:05 WET 2021
+team.description=Testing team
+robocode.version=1.9.3.9
+team.author.name=Daniel Regado
+team.version=0.0
+team.members=sa_robocode.robots.Private*,sa_robocode.robots.Private*,sa_robocode.robots.Private*

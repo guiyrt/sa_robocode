@@ -1,8 +1,8 @@
-package sa_robocode.Communication;
+package Communication;
 
-import sa_robocode.Helpers.Location;
-import sa_robocode.Helpers.ArenaCalculations;
-import sa_robocode.Helpers.Vector;
+import Helpers.Location;
+import Helpers.ArenaCalculations;
+import Helpers.Vector;
 import robocode.Bullet;
 import java.io.Serializable;
 
