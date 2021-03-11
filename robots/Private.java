@@ -222,7 +222,7 @@ public class Private extends TeamRobot {
 	 * @param sre Resulting ScannedRobotEvent instance
 	 */
 	public void onScannedRobot(ScannedRobotEvent sre) {
-		Location detectedRobotLocation = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), getRadarHeading() + sre.getBearing(), sre.getDistance());
+		Location detectedRobotLocation = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), getHeading() + sre.getBearing(), sre.getDistance());
 		ScanInfo si = new ScanInfo(detectedRobotLocation, sre);
 
 		sendMessageToTeam(new Message(si));
