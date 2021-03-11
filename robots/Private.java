@@ -1,7 +1,7 @@
-package Robots;
+package sa_robocode.robots;
 
-import Communication.*;
-import Helpers.*;
+import sa_robocode.Communication.*;
+import sa_robocode.Helpers.*;
 import robocode.*;
 import java.awt.*;
 import java.io.IOException;

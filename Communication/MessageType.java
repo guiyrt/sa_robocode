@@ -1,4 +1,4 @@
-package Communication;
+package sa_robocode.Communication;
 
 import java.io.Serializable;
 

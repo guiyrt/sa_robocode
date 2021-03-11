@@ -1,6 +1,6 @@
-package Communication;
+package sa_robocode.Communication;
 
-import Helpers.Location;
+import sa_robocode.Helpers.Location;
 import java.io.Serializable;
 
 public class MoveRequest implements Serializable {

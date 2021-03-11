@@ -1,0 +1,1 @@
+javac -classpath ../:libs/robocode.jar robots/*.java
