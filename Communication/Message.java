@@ -12,6 +12,7 @@ public class Message implements Serializable {
     private final ScanInfo scanInfo;
     private final FireRequest fireRequest;
     private final MoveRequest moveRequest;
+    private final String informationString;
 
     /**
      * Creates instance of Message with BulletInfo
@@ -23,6 +24,7 @@ public class Message implements Serializable {
         this.scanInfo = null;
         this.fireRequest = null;
         this.moveRequest = null;
+        this.informationString = null;
     }
 
     /**
@@ -35,6 +37,7 @@ public class Message implements Serializable {
         this.bulletInfo = null;
         this.fireRequest = null;
         this.moveRequest = null;
+        this.informationString = null;
     }
 
     /**
@@ -47,6 +50,7 @@ public class Message implements Serializable {
         this.bulletInfo = null;
         this.scanInfo = null;
         this.moveRequest = null;
+        this.informationString = null;
     }
 
     /**
@@ -59,6 +63,22 @@ public class Message implements Serializable {
         this.bulletInfo = null;
         this.scanInfo = null;
         this.fireRequest = null;
+        this.informationString = null;
+    }
+
+    /**
+     * Creates instance of Message with a information String
+     * @param informationString String instance
+     * @param messageType Type of information
+     */
+    public Message(String informationString, MessageType messageType) {
+        this.messageType = messageType;
+        this.informationString = informationString;
+        this.moveRequest = null;
+        this.bulletInfo = null;
+        this.scanInfo = null;
+        this.fireRequest = null;
+
     }
 
     /**
@@ -104,4 +124,14 @@ public class Message implements Serializable {
     public MoveRequest getMoveRequest() {
         return moveRequest;
     }
+
+    /**
+     * Gets information regarding informationString
+     * Could be null, if messageType is not meant for this information transmission
+     * @return String from message
+     */
+    public String getInformationString() {
+        return informationString;
+    }
+
 }

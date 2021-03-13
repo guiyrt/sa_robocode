@@ -11,15 +11,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Private - a robot by Group 9
+ * Captain - a robot by Group 9
  */
-public class Private extends TeamRobot {
+public class Captain extends TeamRobot {
 	/**
 	 * Definition of colors to paint robots.
 	 */
 	private static final Color ARMY_GREEN = Color.decode("#3A4119");
 	private static final Color ARMY_DARK_GREEN = Color.decode("#2A2E12");
-	private static final Color RADAR_GREEN = Color.decode("#CC0000");
+	private static final Color RADAR_RED = Color.decode("#CC0000");
 	private static final Color COPPER_BULLET = Color.decode("#B87333");
 	private static final Color BEAM_BLUE = Color.decode("#ADD8E6");
 
@@ -34,14 +34,11 @@ public class Private extends TeamRobot {
 	 * Main method with robot behavior.
 	 */
 	public void run() {
-		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_GREEN, COPPER_BULLET, BEAM_BLUE);
+		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
+		sendMessageToTeam(new Message(getName(), MessageType.TEAMMATE_INFO)); // Register name
 
-		if (getName().contains("2")) {
-			goToLocation(new Location(50.0,50.0));
-			System.out.println("50 50");
-			goToLocation(new Location(750.0,550.0));
-			System.out.println("750 550");
-			requestFireToLocation(1.0, new Location(0.0, 0.0));
+		while (true) {
+			turnRadarLeft(360);
 		}
 	}
 
@@ -50,7 +47,14 @@ public class Private extends TeamRobot {
 	 * @param g2d Graphics2D instance from robocode instance
 	 */
 	public void onPaint(Graphics2D g2d) {
+		for(List<ScanInfo> l: enemiesTracking.values()) {
+			Painter.drawCircleAround(g2d, Color.red, l.get(0).getLocation(), 50);
+		}
 
+		for(ScanInfo si: teammatesTracking.values()) {
+			if (si == null) continue;
+			Painter.drawCircleAround(g2d, Color.green, si.getLocation(), 50);
+		}
 	}
 
 	/**
@@ -89,6 +93,18 @@ public class Private extends TeamRobot {
 		else {
 			turnRight(rightAngleOffset);
 		}
+	}
+
+	public void registerTeammate(String name) {
+		// In case teammate was scanned before registration
+		enemiesTracking.remove(name);
+
+		// Add teammate to tracking
+		teammatesTracking.put(name, null);
+	}
+
+	public boolean isRegisteredTeammate(String name) {
+		return teammatesTracking.containsKey(name);
 	}
 
 	/**
@@ -144,7 +160,7 @@ public class Private extends TeamRobot {
 			return;
 		}
 
-		if (isTeammate(name)) {
+		if (isRegisteredTeammate(name)) {
 			teammatesTracking.put(name, si);
 		}
 
@@ -213,6 +229,11 @@ public class Private extends TeamRobot {
 			case MOVE_REQUEST -> {
 				MoveRequest mr = message.getMoveRequest();
 				goToLocation(mr.getDestination());
+			}
+
+			case TEAMMATE_INFO -> {
+				String is = message.getInformationString();
+				registerTeammate(is);
 			}
 		}
 	}
