@@ -6,7 +6,7 @@ import java.io.Serializable;
  * Class implementation to represent Cartesian Coordinates
  */
 public class Location implements Serializable {
-    private static final double DEFAULT_DISTANCE_TOLERANCE = Math.pow(1, -5); // Default tolerance value to determine if two Locations are the same
+    private static final double DEFAULT_DISTANCE_TOLERANCE = Math.pow(10, -5); // Default tolerance value to determine if two Locations are the same
 
     private final Double x; // X coordinate
     private final Double y; // Y coordinate
