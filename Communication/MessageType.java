@@ -8,7 +8,9 @@ import java.io.Serializable;
 public enum MessageType implements Serializable {
     BULLET_INFO,
     SCAN_INFO,
-    TEAMMATE_INFO,
+    STATUS_INFO,
+    GUN_READY_INFO,
+    TEAMMATE_REGISTER,
     FIRE_REQUEST,
-    MOVE_REQUEST,
+    MOVE_REQUEST
 }

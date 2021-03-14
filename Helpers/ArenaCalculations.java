@@ -64,16 +64,6 @@ public class ArenaCalculations {
     }
 
     /**
-     * Calculates the necessary rotation between two angles, counter-clockwise
-     * @param from Starting angle
-     * @param to Desired angle
-     * @return Counter-clockwise rotation from starting angle to desired angle
-     */
-    public static double angleDeltaLeft(double from, double to) {
-        return (from > to) ? from - to : from + FULL_ROTATION - to;
-    }
-
-    /**
      * Given origin, angle and length (information of Polar Coordinates), converts to Cartesian Coordinates
      * @param origin Point of reference
      * @param angle Angle in degrees (from Y axis, clockwise)
@@ -110,5 +100,12 @@ public class ArenaCalculations {
      */
     public static boolean isInsideArena(Location location, Double arenaWidth, Double arenaHeight) {
         return (location.getX() <= arenaWidth) && (location.getY() <= arenaHeight) && (location.getX() >= 0) && (location.getY() >= 0);
+    }
+
+    public static double angleRightOffsetToLocation(double heading, Location origin, Location target) {
+        double theta = ArenaCalculations.angleFromOriginToLocation(origin, target);
+        double rightAngleOffset = ArenaCalculations.angleDeltaRight(heading, theta);
+
+        return (rightAngleOffset < reverseAngleOrientation(rightAngleOffset)) ? rightAngleOffset : rightAngleOffset - FULL_ROTATION;
     }
 }

@@ -12,7 +12,22 @@ public class Message implements Serializable {
     private final ScanInfo scanInfo;
     private final FireRequest fireRequest;
     private final MoveRequest moveRequest;
+    private final TeammateInfo teammateInfo;
     private final String informationString;
+
+    /**
+     * Creates instance of Message only with MessageType, no other content
+     * @param messageType MessageType instance
+     */
+    public Message(MessageType messageType) {
+        this.messageType = messageType;
+        this.bulletInfo = null;
+        this.scanInfo = null;
+        this.fireRequest = null;
+        this.moveRequest = null;
+        this.teammateInfo = null;
+        this.informationString = null;
+    }
 
     /**
      * Creates instance of Message with BulletInfo
@@ -24,6 +39,7 @@ public class Message implements Serializable {
         this.scanInfo = null;
         this.fireRequest = null;
         this.moveRequest = null;
+        this.teammateInfo = null;
         this.informationString = null;
     }
 
@@ -37,6 +53,7 @@ public class Message implements Serializable {
         this.bulletInfo = null;
         this.fireRequest = null;
         this.moveRequest = null;
+        this.teammateInfo = null;
         this.informationString = null;
     }
 
@@ -50,6 +67,7 @@ public class Message implements Serializable {
         this.bulletInfo = null;
         this.scanInfo = null;
         this.moveRequest = null;
+        this.teammateInfo = null;
         this.informationString = null;
     }
 
@@ -63,13 +81,28 @@ public class Message implements Serializable {
         this.bulletInfo = null;
         this.scanInfo = null;
         this.fireRequest = null;
+        this.teammateInfo = null;
+        this.informationString = null;
+    }
+
+    /**
+     * Creates instance of Message with a information String
+     * @param teammateInfo TeammateInfo instance
+     */
+    public Message(TeammateInfo teammateInfo) {
+        this.messageType = MessageType.TEAMMATE_REGISTER;
+        this.teammateInfo = teammateInfo;
+        this.moveRequest = null;
+        this.bulletInfo = null;
+        this.scanInfo = null;
+        this.fireRequest = null;
         this.informationString = null;
     }
 
     /**
      * Creates instance of Message with a information String
      * @param informationString String instance
-     * @param messageType Type of information
+     * @param messageType Message type
      */
     public Message(String informationString, MessageType messageType) {
         this.messageType = messageType;
@@ -78,7 +111,7 @@ public class Message implements Serializable {
         this.bulletInfo = null;
         this.scanInfo = null;
         this.fireRequest = null;
-
+        this.teammateInfo = null;
     }
 
     /**
@@ -126,6 +159,15 @@ public class Message implements Serializable {
     }
 
     /**
+     * Gets information regarding TeammateInfo
+     * Could be null, if messageType is not meant for this information transmission
+     * @return TeammateInfo from message
+     */
+    public TeammateInfo getTeammateInfo() {
+        return teammateInfo;
+    }
+
+    /**
      * Gets information regarding informationString
      * Could be null, if messageType is not meant for this information transmission
      * @return String from message
@@ -133,5 +175,4 @@ public class Message implements Serializable {
     public String getInformationString() {
         return informationString;
     }
-
 }

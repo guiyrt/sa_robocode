@@ -1,1 +1,1 @@
-javac -classpath ../:libs/robocode.jar robots/*.java
+javac -classpath ../:Libs/robocode.jar:Libs/StandardOdometer.jar robots/*.java

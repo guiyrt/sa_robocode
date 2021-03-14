@@ -5,17 +5,21 @@ import sa_robocode.Helpers.*;
 import robocode.*;
 import java.awt.*;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Captain - a robot by Group 9
  */
 public class Captain extends TeamRobot {
 	/**
-	 * Definition of colors to paint robots.
+	 * Robot defining static attributes
+	 */
+	private static final RobotType robotType = RobotType.CAPTAIN;
+
+	/**
+	 * Definition of colors to paint robots
 	 */
 	private static final Color ARMY_GREEN = Color.decode("#3A4119");
 	private static final Color ARMY_DARK_GREEN = Color.decode("#2A2E12");
@@ -28,16 +32,30 @@ public class Captain extends TeamRobot {
 	 */
 	private final Map<String, List<ScanInfo>> enemiesTracking = new HashMap<>();
 	private final Map<String, ScanInfo> teammatesTracking = new HashMap<>();
+	private final Map<String, TeammateInfo> teamStatus = new HashMap<>();
+	private final Map<String, Boolean> gunStatus = new HashMap<>();
 	private final List<BulletInfo> teamBullets = new ArrayList<>();
+	private String currentLeader = null;
+	private Boolean gunCoolingDown = true;
 
 	/**
 	 * Main method with robot behavior.
 	 */
 	public void run() {
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
-		sendMessageToTeam(new Message(getName(), MessageType.TEAMMATE_INFO)); // Register name
+		sendMessageToTeam(new Message(new TeammateInfo(getName(), robotType, getEnergy()))); // Register in team
 
 		while (true) {
+			if (getName().equals(currentLeader) && readyToRainFire()) {
+				if (enemiesTracking.values().size() > 0) {
+					String enemy = enemiesTracking.keySet().stream().reduce("", (a,b) -> b);
+					Location target = enemiesTracking.get(enemy).get(0).getLocation();
+
+					requestFireToLocation(10.0, target);
+					faceTowards(target);
+					fireAndBroadcast(10.0);
+				}
+			}
 			turnRadarLeft(360);
 		}
 	}
@@ -79,32 +97,12 @@ public class Captain extends TeamRobot {
 	 * @param location Destination
 	 */
 	public void faceTowards(Location location) {
-		Location current = new Location(getX(), getY());
-		double headingAngle = getHeading();
-		double theta = ArenaCalculations.angleFromOriginToLocation(current, location);
-
-		// Figure out which side requires less rotation
-		double leftAngleOffset = ArenaCalculations.angleDeltaLeft(headingAngle, theta);
-		double rightAngleOffset = ArenaCalculations.angleDeltaRight(headingAngle, theta);
-
-		if (leftAngleOffset < rightAngleOffset) {
-			turnLeft(leftAngleOffset);
-		}
-		else {
-			turnRight(rightAngleOffset);
-		}
-	}
-
-	public void registerTeammate(String name) {
-		// In case teammate was scanned before registration
-		enemiesTracking.remove(name);
-
-		// Add teammate to tracking
-		teammatesTracking.put(name, null);
+		double angleOffset = ArenaCalculations.angleRightOffsetToLocation(getHeading(), getCurrentLocation(), location);
+		turnRight(angleOffset);
 	}
 
 	public boolean isRegisteredTeammate(String name) {
-		return teammatesTracking.containsKey(name);
+		return teamStatus.values().stream().map(TeammateInfo::getName).anyMatch(teammate -> teammate.equals(name));
 	}
 
 	/**
@@ -121,7 +119,7 @@ public class Captain extends TeamRobot {
 	 * @param power Desired power
 	 * @param location Desired location
 	 */
-	public void requestFireToLocation(Double power, Location location, String teammate) {
+	public void requestFireToLocation(String teammate, Double power, Location location) {
 		FireRequest fr = new FireRequest(power, location);
 		sendMessageToTeammate(teammate, new Message(fr));
 	}
@@ -145,7 +143,12 @@ public class Captain extends TeamRobot {
 			Long fireTick = getTime();
 			BulletInfo bulletInfo = new BulletInfo(fireBullet(power), fireTick, new Location(getX(), getY()), getBattleFieldWidth(), getBattleFieldHeight());
 			sendMessageToTeam(new Message(bulletInfo));
+			gunCoolingDown = true;
 		}
+	}
+
+	public boolean readyToRainFire() {
+		return gunStatus.values().stream().reduce(getGunHeat() == 0.0, (a, b) -> a && b);
 	}
 
 	/**
@@ -173,6 +176,33 @@ public class Captain extends TeamRobot {
 			// Add last tracked location to head of list
 			enemiesTracking.get(name).add(0, si);
 		}
+	}
+
+	public void checkHierarchy() {
+		// Add self to consideration
+		teamStatus.put(getName(), new TeammateInfo(getName(), robotType, getEnergy()));
+
+		// Sort team elements by last known energy level
+		Set<TeammateInfo> energySorted = teamStatus.values().stream()
+				.sorted(Comparator.comparingDouble(TeammateInfo::getEnergy).reversed())
+				.collect(Collectors.toCollection(LinkedHashSet::new));
+
+		// Compare leadership abilities iterating through the set
+		int bestLeaderScore = TeammateInfo.NOT_SUITABLE_FOR_LEADERSHIP;
+		String leader = null;
+
+		for (TeammateInfo ti: energySorted) {
+			String name = ti.getName();
+			int leaderPriority = ti.getLeaderPriority();
+
+			// Compare with current leader
+			if (leaderPriority > bestLeaderScore) {
+				bestLeaderScore = leaderPriority;
+				leader = name;
+			}
+		}
+
+		currentLeader = leader;
 	}
 
 	/**
@@ -210,6 +240,12 @@ public class Captain extends TeamRobot {
 		Message message = (Message) me.getMessage();
 
 		switch (message.getMessageType()) {
+			case STATUS_INFO -> {
+				TeammateInfo ti = message.getTeammateInfo();
+				teamStatus.put(ti.getName(), ti);
+				checkHierarchy();
+			}
+
 			case SCAN_INFO -> {
 				ScanInfo si = message.getScanInfo();
 				processScanInfo(si);
@@ -218,6 +254,13 @@ public class Captain extends TeamRobot {
 			case BULLET_INFO -> {
 				BulletInfo bi = message.getBulletInfo();
 				teamBullets.add(bi);
+
+				// After firing, gun is cooling down
+				gunStatus.put(me.getSender(), false);
+			}
+
+			case GUN_READY_INFO -> {
+				gunStatus.put(me.getSender(), true);
 			}
 
 			case FIRE_REQUEST -> {
@@ -231,11 +274,19 @@ public class Captain extends TeamRobot {
 				goToLocation(mr.getDestination());
 			}
 
-			case TEAMMATE_INFO -> {
-				String is = message.getInformationString();
-				registerTeammate(is);
+			case TEAMMATE_REGISTER -> {
+				TeammateInfo ti = message.getTeammateInfo();
+				teamStatus.put(ti.getName(), ti);
+				checkHierarchy();
+
+				// In case teammate was scanned before registration
+				enemiesTracking.remove(ti.getName());
 			}
 		}
+	}
+
+	public Location getRobotLocationFromScanEvent(ScannedRobotEvent sre) {
+		return ArenaCalculations.polarInfoToLocation(getCurrentLocation(), getHeading() + sre.getBearing(), sre.getDistance());
 	}
 
 	/**
@@ -243,7 +294,7 @@ public class Captain extends TeamRobot {
 	 * @param sre Resulting ScannedRobotEvent instance
 	 */
 	public void onScannedRobot(ScannedRobotEvent sre) {
-		Location detectedRobotLocation = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), getHeading() + sre.getBearing(), sre.getDistance());
+		Location detectedRobotLocation = getRobotLocationFromScanEvent(sre);
 		ScanInfo si = new ScanInfo(detectedRobotLocation, sre);
 
 		sendMessageToTeam(new Message(si));
@@ -255,8 +306,7 @@ public class Captain extends TeamRobot {
 	 * @param e Resulting HitByBulletEvent instance
 	 */
 	public void onHitByBullet(HitByBulletEvent e) {
-		// Replace the next line with any behavior you would like
-		back(10);
+
 	}
 
 	/**
@@ -264,8 +314,7 @@ public class Captain extends TeamRobot {
 	 * @param e Resulting HitWallEvent instance
 	 */
 	public void onHitWall(HitWallEvent e) {
-		// Replace the next line with any behavior you would like
-		back(20);
+
 	}
 
 	/**
@@ -273,5 +322,35 @@ public class Captain extends TeamRobot {
 	 * @param e Resulting BulletHitEvent instance
 	 */
 	public void onBulletHit(BulletHitEvent e) {
+	}
+
+	public void onRobotDeath(RobotDeathEvent e) {
+		String name = e.getName();
+
+		if(isRegisteredTeammate(name)) {
+			teamStatus.remove(name);
+			teammatesTracking.remove(name);
+
+			// Might be necessary leader reelection, so update information
+			// If there are no teammates, just check hierarchy
+			if (teamStatus.keySet().size() > 1) {
+				sendMessageToTeam(new Message(new TeammateInfo(getName(), robotType, getEnergy())));
+			}
+
+			else {
+				checkHierarchy();
+			}
+		}
+
+		else {
+			enemiesTracking.remove(name);
+		}
+	}
+
+	public void onStatus(StatusEvent e) {
+		if (gunCoolingDown && getGunHeat() == 0.0) {
+			sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
+			gunCoolingDown = false;
+		}
 	}
 }
