@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static java.lang.Integer.parseInt;
+
 /**
  * Captain - a robot by Group 9
  */
@@ -29,6 +31,10 @@ public class Captain extends TeamRobot {
 	private final Map<String, List<ScanInfo>> enemiesTracking = new HashMap<>();
 	private final Map<String, ScanInfo> teammatesTracking = new HashMap<>();
 	private final List<BulletInfo> teamBullets = new ArrayList<>();
+	private int rank = 0;
+	private boolean president = false;
+	private boolean electiondone = false;
+	private boolean tryingToFire = false;
 
 	/**
 	 * Main method with robot behavior.
@@ -36,9 +42,13 @@ public class Captain extends TeamRobot {
 	public void run() {
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
 		sendMessageToTeam(new Message(getName(), MessageType.TEAMMATE_INFO)); // Register name
-
-		while (true) {
-			turnRadarLeft(360);
+		election();
+		electiondone = true;
+		this.setDebugProperty("Presidente", Boolean.toString(president));
+		if(president) {
+			while (true) {
+				turnRadarLeft(360);
+			}
 		}
 	}
 
@@ -107,6 +117,41 @@ public class Captain extends TeamRobot {
 		return teammatesTracking.containsKey(name);
 	}
 
+	public int get_number(String name){
+		return parseInt(name.substring(29,name.length()-1));
+	}
+
+	public void election(){
+		rank = get_number(getName());
+		turnRadarLeft(360);
+		for (String name: teammatesTracking.keySet()) {
+			if (get_number(name)< rank){
+				return;
+			}
+		}
+		out.println("presidente");
+		president = true;
+
+	}
+
+	public Location robotLocFromRadar(ScannedRobotEvent e) {
+		double enemyBearing = getHeading() + e.getBearing();
+		double tankX = getX() + e.getDistance() * Math.sin(Math.toRadians(enemyBearing));
+		double tankY = getY() + e.getDistance() * Math.cos(Math.toRadians(enemyBearing));
+
+		return new Location(tankX, tankY);
+	}
+
+	public Boolean inTheWay(Location start,Location destiny,Location friend ){
+		if(destiny.getX() != start.getX()){
+			double slope = (destiny.getY()-start.getY())/(destiny.getX()-start.getX());
+			double b = start.getY() - slope*start.getX();
+		}else{
+
+		}
+		return false;
+	}
+
 	/**
 	 * Requests teammate to move to location
 	 * @param location Desired location
@@ -162,16 +207,30 @@ public class Captain extends TeamRobot {
 
 		if (isRegisteredTeammate(name)) {
 			teammatesTracking.put(name, si);
+			//out.println("detetei teammate" + si.getScannedRobotEvent().getName());
+			if(!president){
+				out.println(tryingToFire);
+				if(tryingToFire) {
+					out.println("detetei teammate" + si.getScannedRobotEvent().getName());
+					Location old = robotLocFromRadar(si.getScannedRobotEvent());
+					Location dest = new Location(old.getX() + 20, old.getY() + 20);
+					requestMoveToLocation(dest, si.getScannedRobotEvent().getName());
+				}
+			}
 		}
 
 		else {
 			// Check if enemy was already detected before
-			if (!enemiesTracking.containsKey(name)) {
-				enemiesTracking.put(name, new ArrayList<>());
-			}
+			if(president) {
+				if (!enemiesTracking.containsKey(name)) {
+					enemiesTracking.put(name, new ArrayList<>());
+				}
 
-			// Add last tracked location to head of list
-			enemiesTracking.get(name).add(0, si);
+				// Add last tracked location to head of list
+				enemiesTracking.get(name).add(0, si);
+				//out.println("inimigo detetado " +si.getScannedRobotEvent().getName());
+				requestFireToLocation(0.1, robotLocFromRadar(si.getScannedRobotEvent()));
+			}
 		}
 	}
 
@@ -221,18 +280,26 @@ public class Captain extends TeamRobot {
 			}
 
 			case FIRE_REQUEST -> {
-				FireRequest fr = message.getFireRequest();
-				faceTowards(fr.getTarget());
-				fireAndBroadcast(fr.getPower());
+				if(!president) {
+					//out.println("pedido para disparar");
+					FireRequest fr = message.getFireRequest();
+					faceTowards(fr.getTarget());
+					tryingToFire = true;
+					scan();
+					fireAndBroadcast(fr.getPower());
+					tryingToFire = false;
+				}
 			}
 
 			case MOVE_REQUEST -> {
+				out.println("recebi pedido de mudança");
 				MoveRequest mr = message.getMoveRequest();
 				goToLocation(mr.getDestination());
 			}
 
 			case TEAMMATE_INFO -> {
 				String is = message.getInformationString();
+				out.println(get_number(is));
 				registerTeammate(is);
 			}
 		}
@@ -245,8 +312,9 @@ public class Captain extends TeamRobot {
 	public void onScannedRobot(ScannedRobotEvent sre) {
 		Location detectedRobotLocation = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), getHeading() + sre.getBearing(), sre.getDistance());
 		ScanInfo si = new ScanInfo(detectedRobotLocation, sre);
-
-		sendMessageToTeam(new Message(si));
+		if(president) {
+			sendMessageToTeam(new Message(si));
+		}
 		processScanInfo(si);
 	}
 
