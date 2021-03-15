@@ -3,6 +3,8 @@ package sa_robocode.robots;
 import sa_robocode.Communication.*;
 import sa_robocode.Helpers.*;
 import robocode.*;
+import sa_robocode.Helpers.Vector;
+
 import java.awt.*;
 import java.io.IOException;
 import java.util.*;
@@ -34,7 +36,7 @@ public class Captain extends TeamRobot {
 	private final Map<String, ScanInfo> teammatesTracking = new HashMap<>();
 	private final Map<String, TeammateInfo> teamStatus = new HashMap<>();
 	private final Map<String, Boolean> gunStatus = new HashMap<>();
-	private final List<BulletInfo> teamBullets = new ArrayList<>();
+	private List<BulletInfo> teamBullets = new ArrayList<>();
 	private String currentLeader = null;
 	private Boolean gunCoolingDown = true;
 
@@ -45,18 +47,22 @@ public class Captain extends TeamRobot {
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
 		sendMessageToTeam(new Message(new TeammateInfo(getName(), robotType, getEnergy()))); // Register in team
 
+
 		while (true) {
 			if (getName().equals(currentLeader) && readyToRainFire()) {
-				if (enemiesTracking.values().size() > 0) {
-					String enemy = enemiesTracking.keySet().stream().reduce("", (a,b) -> b);
-					Location target = enemiesTracking.get(enemy).get(0).getLocation();
+				List<List<ScanInfo>> a = new ArrayList<>(enemiesTracking.values());
+
+
+				if (a.size() > 0) {
+					Location target = a.get(0).get(0).getLocation();
 
 					requestFireToLocation(10.0, target);
 					faceTowards(target);
 					fireAndBroadcast(10.0);
 				}
 			}
-			turnRadarLeft(360);
+
+			turnRadarLeft(45);
 		}
 	}
 
@@ -66,12 +72,31 @@ public class Captain extends TeamRobot {
 	 */
 	public void onPaint(Graphics2D g2d) {
 		for(List<ScanInfo> l: enemiesTracking.values()) {
-			Painter.drawCircleAround(g2d, Color.red, l.get(0).getLocation(), 50);
+			List<Location> edges = ArenaCalculations.getEdgesFromCenterLocation(l.get(0).getLocation(), l.get(0).getScannedRobotEvent().getHeading(), 28.0);
+
+			Location leftEdge = ArenaCalculations.getEdge(edges, false, true, true);
+			Location rightEdge = ArenaCalculations.getEdge(edges, false, false, false);
+			Location bottomEdge = ArenaCalculations.getEdge(edges, true, true, false);
+			Location topEdge = ArenaCalculations.getEdge(edges, true, false, true);
+
+			Painter.drawLine(g2d, Color.red, leftEdge, topEdge);
+			Painter.drawLine(g2d, Color.red, topEdge, rightEdge);
+			Painter.drawLine(g2d, Color.red, rightEdge, bottomEdge);
+			Painter.drawLine(g2d, Color.red, bottomEdge, leftEdge);
 		}
 
 		for(ScanInfo si: teammatesTracking.values()) {
-			if (si == null) continue;
-			Painter.drawCircleAround(g2d, Color.green, si.getLocation(), 50);
+			List<Location> edges = ArenaCalculations.getEdgesFromCenterLocation(si.getLocation(), si.getScannedRobotEvent().getHeading(), 28.0);
+
+			Location leftEdge = ArenaCalculations.getEdge(edges, false, true, true);
+			Location rightEdge = ArenaCalculations.getEdge(edges, false, false, false);
+			Location bottomEdge = ArenaCalculations.getEdge(edges, true, true, false);
+			Location topEdge = ArenaCalculations.getEdge(edges, true, false, true);
+
+			Painter.drawLine(g2d, Color.green, leftEdge, topEdge);
+			Painter.drawLine(g2d, Color.green, topEdge, rightEdge);
+			Painter.drawLine(g2d, Color.green, rightEdge, bottomEdge);
+			Painter.drawLine(g2d, Color.green, bottomEdge, leftEdge);
 		}
 	}
 
@@ -141,13 +166,15 @@ public class Captain extends TeamRobot {
 	public void fireAndBroadcast(double power) {
 		if (getGunHeat() == 0.0) {
 			Long fireTick = getTime();
-			BulletInfo bulletInfo = new BulletInfo(fireBullet(power), fireTick, new Location(getX(), getY()), getBattleFieldWidth(), getBattleFieldHeight());
+			Bullet bi = fireBullet(power);
+			BulletInfo bulletInfo = new BulletInfo(bi, fireTick, new Location(getX(), getY()), getBattleFieldWidth(), getBattleFieldHeight());
 			sendMessageToTeam(new Message(bulletInfo));
 			gunCoolingDown = true;
 		}
 	}
 
 	public boolean readyToRainFire() {
+		System.out.println(gunStatus.values().stream().reduce(getGunHeat() == 0.0, (a, b) -> a && b));
 		return gunStatus.values().stream().reduce(getGunHeat() == 0.0, (a, b) -> a && b);
 	}
 
@@ -330,10 +357,11 @@ public class Captain extends TeamRobot {
 		if(isRegisteredTeammate(name)) {
 			teamStatus.remove(name);
 			teammatesTracking.remove(name);
+			gunStatus.remove(name);
 
 			// Might be necessary leader reelection, so update information
 			// If there are no teammates, just check hierarchy
-			if (teamStatus.keySet().size() > 1) {
+			if (teamStatus.keySet().size() > 0) {
 				sendMessageToTeam(new Message(new TeammateInfo(getName(), robotType, getEnergy())));
 			}
 
@@ -348,9 +376,25 @@ public class Captain extends TeamRobot {
 	}
 
 	public void onStatus(StatusEvent e) {
+		// Inform leader that gun is ready to fire
 		if (gunCoolingDown && getGunHeat() == 0.0) {
 			sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
 			gunCoolingDown = false;
+		}
+
+		// Check if collision with friendly bullet is imminent
+		Vector momentumVector = ArenaCalculations.angleToUnitVector(getHeading());
+		teamBullets.removeIf(bi -> bi.getBulletLocation(e.getTime()) == null);
+
+		for (int i=1; i<=6; i++) {
+			Location nextRobotLocation = momentumVector.setLength(e.getStatus().getVelocity()*i).apply(new Location(e.getStatus().getX(), e.getStatus().getY()));
+
+			for (BulletInfo bi : teamBullets) {
+				Location nextBulletLocation = bi.getBulletLocation(e.getTime() + i);
+				if (nextBulletLocation != null && ArenaCalculations.isLocationInsideRobot(nextRobotLocation, e.getStatus().getHeading(), nextBulletLocation)) {
+					back(20.0);
+				}
+			}
 		}
 	}
 }

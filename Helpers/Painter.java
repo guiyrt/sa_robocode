@@ -7,7 +7,6 @@ import java.awt.*;
  */
 public class Painter {
     private static final Integer LOCATION_PAINT_SIZE_PIXELS = 3; // Default size to paint Location instances
-    private static final Double UPPER_LEFT_TO_CENTER_CIRCLE_DEGREES = 225.0; // Angle value to calculate center location to draw circles
 
     /**
      * Draws a circle around a input location
@@ -18,8 +17,8 @@ public class Painter {
      */
     public static void drawCircleAround(Graphics2D g2d, Color color, Location location, int diameter) {
         g2d.setColor(color);
-        Location centerOfCircle = ArenaCalculations.polarInfoToLocation(location, UPPER_LEFT_TO_CENTER_CIRCLE_DEGREES, diameter/2.0);
-        g2d.drawOval((int) centerOfCircle.getX(), (int) centerOfCircle.getY(), diameter, diameter);
+        double offset = Math.sin(Math.PI/4) * (diameter/2.0);
+        g2d.drawOval((int) (location.getX() - offset), (int) (location.getY() - offset), diameter, diameter);
     }
 
     /**

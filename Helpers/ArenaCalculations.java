@@ -1,5 +1,13 @@
 package sa_robocode.Helpers;
 
+import java.awt.*;
+import java.awt.geom.Path2D;
+import java.awt.geom.Point2D;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+
 /**
  * Static class implementation to deal with arena angle and coordinates calculations
  */
@@ -10,6 +18,9 @@ public class ArenaCalculations {
      */
     private static final Double POLAR_TO_ARENA_ANGLE_OFFSET = 90.0;
     private static final Double FULL_ROTATION = 360.0;
+    private static final Double ROBOT_DIMENSION = 36.0;
+    private static final Double ROBOT_CENTER_TO_EDGE = Math.sqrt(Math.pow(ROBOT_DIMENSION/2, 2) + Math.pow(ROBOT_DIMENSION/2, 2));
+    private static final Double SAFE_TOLERANCE = 6.0;
 
     /**
      * Adds a delta angle to an input angle
@@ -107,5 +118,66 @@ public class ArenaCalculations {
         double rightAngleOffset = ArenaCalculations.angleDeltaRight(heading, theta);
 
         return (rightAngleOffset < reverseAngleOrientation(rightAngleOffset)) ? rightAngleOffset : rightAngleOffset - FULL_ROTATION;
+    }
+
+    public static List<Location> getEdgesFromCenterLocation(Location robot, Double heading, Double centerToCornerLength) {
+        List<Location> edges = new ArrayList<>();
+        double angleDegrees = 90 - ((heading + 45) % 90), deltaX, deltaY;
+
+        for (int i=0; i<4; i++) {
+            angleDegrees += 90;
+            deltaY = Math.sin(Math.toRadians(angleDegrees)) * centerToCornerLength;
+            deltaX = Math.cos(Math.toRadians(angleDegrees)) * centerToCornerLength;
+
+            edges.add(new Location(robot.getX() + deltaX, robot.getY() + deltaY));
+        }
+
+        return edges;
+    }
+
+    public static boolean isLocationInsideRobot(Location robot, double robotHeading, Location location) {
+        List<Location> robotEdges = getEdgesFromCenterLocation(robot, robotHeading, ROBOT_CENTER_TO_EDGE + SAFE_TOLERANCE);
+        Path2D robotLimits = new Path2D.Double();
+
+        Location leftEdge = ArenaCalculations.getEdge(robotEdges, false, true, true);
+        Location rightEdge = ArenaCalculations.getEdge(robotEdges, false, false, false);
+        Location bottomEdge = ArenaCalculations.getEdge(robotEdges, true, true, false);
+        Location topEdge = ArenaCalculations.getEdge(robotEdges, true, false, true);
+
+        robotLimits.moveTo(topEdge.getX(), topEdge.getY());
+        robotLimits.lineTo(rightEdge.getX(), rightEdge.getY());
+        robotLimits.lineTo(bottomEdge.getX(), bottomEdge.getY());
+        robotLimits.lineTo(leftEdge.getX(), leftEdge.getY());
+        robotLimits.closePath();
+
+        return robotLimits.contains(new Point2D.Double(location.getX(), location.getY()));
+    }
+
+    // For example, to get top edge, and the one to the left if there are two edges with same Y:
+    // getEdge(true, false, true), in other words, order by Y, the farthest way from Y axis, and the closest to X axis if top two edges have the same Y
+    public static Location getEdge(List<Location> edges, boolean vertical, boolean closestToAxis, boolean closestToOriginIfEqual) {
+        if (vertical) {
+            edges.sort(Comparator.comparingDouble(Location::getY));
+        }
+        else {
+            edges.sort(Comparator.comparingDouble(Location::getX));
+        }
+
+
+        Location first = closestToAxis ? edges.get(0) : edges.get(3);
+        Location second = closestToAxis ? edges.get(1) : edges.get(2);
+
+        boolean isFirstClosestToOrigin = vertical ? first.getX() < second.getX() : first.getY() < second.getY();
+        boolean firstEqualsSecond = vertical ? first.getY() == second.getY() : first.getX() == second.getX();
+
+        if (firstEqualsSecond) {
+            if (closestToOriginIfEqual) {
+                return (isFirstClosestToOrigin) ? first : second;
+            } else {
+                return (isFirstClosestToOrigin) ? second : first;
+            }
+        }
+
+        return first;
     }
 }
