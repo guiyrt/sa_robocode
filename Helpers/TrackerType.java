@@ -5,5 +5,6 @@ import java.io.Serializable;
 public enum TrackerType implements Serializable {
     DUCK,
     CRAB,
-    SHARK
+    SHARK,
+    NO_PATTERN
 }

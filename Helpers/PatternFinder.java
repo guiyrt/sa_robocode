@@ -9,33 +9,27 @@ public class PatternFinder {
     /**
      * Attempts to detect stationary robot
      * @param list List of last detected locations
-     * @param threshold Minimum of locations to corroborate the line defined by last 2 locations
+     * @param threshold Minimum of locations to corroborate standing still
      * @return Location where robot is standing still, null otherwise
      */
     public static Location patternSittingDuck(List<ScanInfo> list, int threshold) {
         // List needs to have at least 2 known locations
-        if (list.size() < threshold + 2) {
+        if (list.size() < threshold + 1) {
             return null;
         }
 
         // Use last known location as reference
         Location init = list.get(0).getLocation();
-        int counter = 1;
 
-        for (ScanInfo si: list.subList(1, list.size())) {
-            // If past locations are the same as init, increment counter
-            if (si.getLocation().sameAs(init)) {
-                counter++;
-            }
-
-            // End verification when found one location that did not correspond to reference
-            else {
-                break;
+        for (ScanInfo si: list.subList(1, threshold + 1)) {
+            // If past locations are different, duck is not sitting
+            if (!si.getLocation().sameAs(init)) {
+                return null;
             }
         }
 
         // Check if counter got enough same locations
-        return counter >= threshold ? init : null;
+        return init;
     }
 
     /**
@@ -52,7 +46,16 @@ public class PatternFinder {
 
         ScanInfo p1 = list.get(0);
         ScanInfo p2 = list.get(1);
-        int counter = 1;
+        int i = 0;
+        int counter = 0;
+
+        for(; (i < list.size()) && (p1.getLocation().sameAs(p2.getLocation())); i++) {
+            p2 = list.get(i);
+        }
+
+        if (p1.getLocation().sameAs(p2.getLocation())) {
+            return null;
+        }
 
         // Find m and b values to get linear equation
         Line line = new Line(p1.getLocation(), p2.getLocation());
@@ -62,7 +65,6 @@ public class PatternFinder {
             if (line.isLocationInLine(si.getLocation())) {
                 counter++;
             }
-
             else {
                 break;
             }
@@ -86,22 +88,17 @@ public class PatternFinder {
         ScanInfo p1 = list.get(0);
         ScanInfo p2 = list.get(1);
         ScanInfo p3 = list.get(2);
-        int counter = 1;
 
         // Find circle equation
         Circle circle = new Circle(p1.getLocation(), p2.getLocation(), p3.getLocation());
 
-        for (ScanInfo si: list.subList(3, list.size())) {
+        for (ScanInfo si: list.subList(3, threshold + 3)) {
             // Check if location satisfies equation
-            if (circle.isLocationInCircle(si.getLocation())) {
-                counter++;
-            }
-
-            else {
-                break;
+            if (!circle.isLocationInCircle(si.getLocation())) {
+                return null;
             }
         }
 
-        return counter >= threshold ? circle : null;
+        return circle;
     }
 }

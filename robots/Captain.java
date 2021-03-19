@@ -2,6 +2,8 @@ package sa_robocode.robots;
 
 import sa_robocode.Communication.*;
 import sa_robocode.Helpers.*;
+import sa_robocode.Helpers.PatternFinder;
+import sa_robocode.Helpers.Circle;
 import robocode.*;
 import sa_robocode.Helpers.Vector;
 
@@ -40,6 +42,7 @@ public class Captain extends TeamRobot {
 	private final Set<Tracker> mostWanted = new LinkedHashSet<>();
 	private String currentLeader = null;
 	private boolean outOfDateBounties = true;
+	private boolean waitingForBounty = false;
 	private Tracker bounty = null;
 
 	/**
@@ -48,6 +51,10 @@ public class Captain extends TeamRobot {
 	private static final int BULLET_ITERATIONS_PREVISION = 9;
 	private static final double AVOID_COLLISION_DISTANCE = 70.0;
 	private static final double TEAMMATE_MIN_DISTANCE_TO_FIRE = 215.0;
+	private static final double MAX_POWER_RADIUS = 120.0;
+	private static final double MIN_BULLET_POWER = 0.1;
+	private static final double BULLET_RANGE_DROPOFF = 50.0;
+	private static final double BULLET_POWER_DROPOFF = 0.20;
 
 
 	/**
@@ -57,15 +64,18 @@ public class Captain extends TeamRobot {
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
 		updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy())); // Register in team
 
-		if (getName().contains("1")) {
-			setTurnRadarLeft(9000);
-			goToLocation(new Location(50.0, 300.0));
-			goToLocation(new Location(400.0, 300.0));
-			faceTowards(new Location(400.0, 400.0));
+		if (getName().contains("3")) {
+			while(true) {
+				goToLocation(new Location(100.0, 100.0));
+				goToLocation(new Location(100.0, 400.0));
+				goToLocation(new Location(100.0, 100.0));
+				goToLocation(new Location(100.0, 400.0));
+				goToLocation(new Location(100.0, 50.0));
+			}
 		}
 
 		else {
-			goToLocation(new Location(400.0, 400.0));
+			setTurnRadarLeft(90000);
 		}
 	}
 
@@ -74,7 +84,11 @@ public class Captain extends TeamRobot {
 	 * @param g2d Graphics2D instance from robocode instance
 	 */
 	public void onPaint(Graphics2D g2d) {
+		Tracker t = enemiesTracking.get("sa_robocode.robots.Captain* (3)");
 
+		if (t.line != null) {
+			Painter.drawLine(g2d, Color.orange, t.line.getStart(), t.line.getEnd());
+		}
 	}
 
 	public void orderBounties() {
@@ -248,13 +262,14 @@ public class Captain extends TeamRobot {
 		for(ScanInfo si: teammatesTracking.values()) {
 			Location currentLocation = getCurrentLocation();
 			Location bullet = getCurrentLocation();
-			Vector bulletVector = new Vector(getCurrentLocation(), location).setLength(17);
+			Vector bulletVector = new Vector(getCurrentLocation(), location).setLength(Rules.getBulletSpeed(0.1));
 
 			// Check if teammate is closer than allowed to shoot
 			if (currentLocation.distanceTo(si.getLocation()) >= TEAMMATE_MIN_DISTANCE_TO_FIRE) {
 				continue;
 			}
 
+			// Check if bullet collided with teammate until bullet passes target location
 			while(new Vector(bullet, location).angleWithVector(bulletVector) != 180) {
 				bullet = bulletVector.apply(bullet);
 				if (ArenaCalculations.isLocationInsideRobot(si.getLocation(), si.getScannedRobotEvent().getHeading(), bullet)) {
@@ -266,13 +281,23 @@ public class Captain extends TeamRobot {
 		return false;
 	}
 
+	public double calculateBulletPower(Location robot, Location target) {
+		double distance = robot.distanceTo(target);
+		return distance <= MAX_POWER_RADIUS ?
+				Rules.MAX_BULLET_POWER :
+				Math.max(Rules.MAX_BULLET_POWER - (((distance - MAX_POWER_RADIUS) / BULLET_RANGE_DROPOFF) * BULLET_POWER_DROPOFF), MIN_BULLET_POWER);
+	}
+
 	public void setBounty(Set<Tracker> mostWanted) {
 		for (Tracker tracker: mostWanted) {
-			if (teammatesBetweenLocation(tracker.getLocationByTick(getTime()))) {
+			if (tracker.noPings() || teammatesBetweenLocation(tracker.getLocationByTick(getTime()))) {
 				continue;
 			}
 
 			bounty = tracker;
+
+			fireAndBroadcast(2.0);
+			bounty = null;
 		}
 	}
 
@@ -320,7 +345,9 @@ public class Captain extends TeamRobot {
 			case SCAN_INFO -> {
 				ScanInfo si = message.getScanInfo();
 				processScanInfo(si);
-				outOfDateBounties = true; // Most wanted needs to be recalculated
+
+				// Most wanted needs to be recalculated
+				outOfDateBounties = true;
 			}
 
 			case BULLET_INFO -> {
@@ -328,6 +355,7 @@ public class Captain extends TeamRobot {
 				teamBullets.add(bi);
 			}
 
+			// Only leader receives these messages
 			case GUN_READY_INFO -> {
 				// Check if kill order needs to be recalculated
 				if (outOfDateBounties) {
@@ -340,6 +368,7 @@ public class Captain extends TeamRobot {
 			case BOUNTIES_INFO -> {
 				Set<Tracker> mostWanted = message.getBounties();
 				setBounty(mostWanted);
+				waitingForBounty = false;
 			}
 
 			case FIRE_REQUEST -> {
@@ -438,13 +467,20 @@ public class Captain extends TeamRobot {
 	}
 
 	public void onStatus(StatusEvent e) {
-		// Ready to fire
-		if (getGunHeat() == 0.0) {
+		// Ready to acquire target
+		if (getGunHeat() == 0.0 && bounty == null) {
 			if (amCurrentLeader()) {
-				// TODO: LEADER BEHAVIOR
+				if (outOfDateBounties) {
+					orderBounties();
+				}
+
+				setBounty(mostWanted);
 			} else {
 				// Inform leader that robot is ready to fire
-				//sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
+				if (!waitingForBounty) {
+					sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
+					waitingForBounty = true;
+				}
 			}
 		}
 

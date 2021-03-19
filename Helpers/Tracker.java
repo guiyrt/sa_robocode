@@ -7,20 +7,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Tracker implements Serializable {
-    private static final int DUCK_THRESHOLD = 3;
-    private static final int CRAB_THRESHOLD = 4;
-    private static final int SHARK_THRESHOLD = 2;
+    private static final int DUCK_THRESHOLD = 2;
+    private static final int CRAB_THRESHOLD = 10;
+    private static final int SHARK_THRESHOLD = 4;
 
     private final List<ScanInfo> pings;
     private final String name;
     private TrackerType trackerType;
     private Circle circle;
-    private Line line;
+    public Line line;
     private Location stopped;
 
     public Tracker(String name) {
         this.pings = new ArrayList<>();
         this.name = name;
+        this.trackerType = TrackerType.NO_PATTERN;
     }
 
     public String getName() {
@@ -28,7 +29,7 @@ public class Tracker implements Serializable {
     }
 
     public void addPing(ScanInfo si) {
-        pings.add(si);
+        pings.add(0, si);
     }
 
     public TrackerType getTrackerType() {
@@ -40,22 +41,31 @@ public class Tracker implements Serializable {
         return pings.get(0).getScannedRobotEvent().getEnergy();
     }
 
+    public boolean noPings() {
+        return pings.stream().findFirst().isEmpty();
+    }
+
+    public void resetPatterns() {
+        trackerType = TrackerType.NO_PATTERN;
+        this.line = null;
+        this.stopped = null;
+        this.circle = null;
+    }
+
     public void findPatterns() {
-        // Reset trackerType
-        trackerType = null;
+        resetPatterns();
 
         Location duck = PatternFinder.patternSittingDuck(pings, DUCK_THRESHOLD);
         Line crab = PatternFinder.patternCrab(pings, CRAB_THRESHOLD);
         Circle shark = PatternFinder.patternShark(pings, SHARK_THRESHOLD);
 
-        if (duck != null) {
-            trackerType = TrackerType.DUCK;
-            stopped = duck;
-        }
-
-        else if (crab != null) {
+        if (crab != null) {
             trackerType = TrackerType.CRAB;
             line = crab;
+        }
+        else if (duck != null) {
+            trackerType = TrackerType.DUCK;
+            stopped = duck;
         }
 
         else if (shark != null) {
@@ -66,13 +76,8 @@ public class Tracker implements Serializable {
 
     public Location getLocationByTick(long tick) {
         ScanInfo lastKnown = pings.get(0);
+        Location future = null;
 
-        // Linear projection (assume no pattern)
-        Location future = ArenaCalculations.angleToUnitVector(lastKnown.getScannedRobotEvent().getHeading()).
-                setLength(lastKnown.getScannedRobotEvent().getVelocity() * (tick - lastKnown.getScannedRobotEvent().getTime())).
-                apply(lastKnown.getLocation());
-
-        // If has any pattern
         switch (trackerType) {
             case DUCK -> {
                 future = stopped;
@@ -86,6 +91,13 @@ public class Tracker implements Serializable {
             case SHARK -> {
                 double orientationSensitiveVelocity = circle.getVelocityOrientation(pings.get(0).getLocation(), pings.get(1).getLocation(), lastKnown.getScannedRobotEvent().getVelocity());
                 future = circle.getLocationByTick(lastKnown, tick, orientationSensitiveVelocity);
+            }
+
+            // Linear projection
+            case NO_PATTERN -> {
+                future = ArenaCalculations.angleToUnitVector(lastKnown.getScannedRobotEvent().getHeading()).
+                        setLength(lastKnown.getScannedRobotEvent().getVelocity() * (tick - lastKnown.getScannedRobotEvent().getTime())).
+                        apply(lastKnown.getLocation());
             }
         }
 

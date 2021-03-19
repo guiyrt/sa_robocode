@@ -2,7 +2,9 @@ package sa_robocode.Helpers;
 
 import sa_robocode.Communication.ScanInfo;
 
-public class Line {
+import java.io.Serializable;
+
+public class Line implements Serializable {
     private static final double TOLERANCE = Math.pow(10, -5);
     private static final Location ORIGIN = new Location(0.0, 0.0);
 
@@ -12,8 +14,15 @@ public class Line {
     private Location end;
 
     public Line(Location l1, Location l2) {
-        this.slope  = (l1.getY() - l2.getY()) / (l1.getX() - l2.getX());
-        this.intercept = (l1.getY()) - (this.slope*l1.getX());
+        if (Math.abs(l1.getX() - l2.getX()) < TOLERANCE) {
+            this.slope = Double.POSITIVE_INFINITY;
+            this.intercept = l1.getX();
+        }
+
+        else {
+            this.slope = (l1.getY() - l2.getY()) / (l1.getX() - l2.getX());
+            this.intercept = (l1.getY()) - (this.slope*l1.getX());
+        }
 
         if (l1.distanceTo(ORIGIN) < l2.distanceTo(ORIGIN)) {
             this.start = l1;
@@ -55,7 +64,9 @@ public class Line {
     }
 
     public boolean isLocationInLine(Location location) {
-        boolean locationInLine = Math.abs(location.getY() - ((getSlope()*location.getX()) + getIntercept())) < TOLERANCE;
+        boolean locationInLine = Double.isInfinite(getSlope()) ?
+                Math.abs(location.getX() - getStart().getX()) < TOLERANCE :
+                Math.abs(location.getY() - ((getSlope()*location.getX()) + getIntercept())) < 1;
 
         if (locationInLine) {
             if (new Vector(location, getEnd()).length() > getLineVector().length()) {

@@ -2,8 +2,12 @@ package sa_robocode.Helpers;
 
 import sa_robocode.Communication.ScanInfo;
 
-public class Circle {
-    private static final double TOLERANCE = Math.pow(10, -5);
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Circle implements Serializable {
+    private static final double TOLERANCE = Math.pow(10, -1);
 
     private final Location center;
     private final double radius;
