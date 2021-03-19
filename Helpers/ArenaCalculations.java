@@ -29,7 +29,7 @@ public class ArenaCalculations {
      * @return Value of original angle plus delta angle
      */
     private static double sumToAngle(double angle, double delta) {
-        return (angle + delta) % FULL_ROTATION;
+        return (angle + delta + FULL_ROTATION) % FULL_ROTATION;
     }
 
     /**
@@ -82,9 +82,8 @@ public class ArenaCalculations {
      * @return Location in Cartesian Coordinates from input Polar Coordinates
      */
     public static Location polarInfoToLocation(Location origin, Double angle, Double length) {
-        double polarAngle = convertAngleToPolarOrArena(angle);
-        double deltaX = Math.cos(Math.toRadians(polarAngle)) * length;
-        double deltaY = Math.sin(Math.toRadians(polarAngle)) * length;
+        double deltaX = Math.cos(Math.toRadians(angle)) * length;
+        double deltaY = Math.sin(Math.toRadians(angle)) * length;
 
         return new Location(origin.getX() + deltaX, origin.getY() + deltaY);
     }
@@ -117,17 +116,21 @@ public class ArenaCalculations {
         double theta = ArenaCalculations.angleFromOriginToLocation(origin, target);
         double rightAngleOffset = ArenaCalculations.angleDeltaRight(heading, theta);
 
-        return (rightAngleOffset < reverseAngleOrientation(rightAngleOffset)) ? rightAngleOffset : rightAngleOffset - FULL_ROTATION;
+        return shortestAngle(rightAngleOffset);
     }
 
-    public static List<Location> getEdgesFromCenterLocation(Location robot, Double heading, Double centerToCornerLength) {
+    public static double shortestAngle(double angle) {
+        return (angle < reverseAngleOrientation(angle)) ? angle : angle - FULL_ROTATION;
+    }
+
+    public static List<Location> getEdgesFromCenterLocation(Location robot, Double heading) {
         List<Location> edges = new ArrayList<>();
         double angleDegrees = 90 - ((heading + 45) % 90), deltaX, deltaY;
 
         for (int i=0; i<4; i++) {
             angleDegrees += 90;
-            deltaY = Math.sin(Math.toRadians(angleDegrees)) * centerToCornerLength;
-            deltaX = Math.cos(Math.toRadians(angleDegrees)) * centerToCornerLength;
+            deltaY = Math.sin(Math.toRadians(angleDegrees)) * (ROBOT_CENTER_TO_EDGE + SAFE_TOLERANCE);
+            deltaX = Math.cos(Math.toRadians(angleDegrees)) * (ROBOT_CENTER_TO_EDGE + SAFE_TOLERANCE);
 
             edges.add(new Location(robot.getX() + deltaX, robot.getY() + deltaY));
         }
@@ -136,7 +139,7 @@ public class ArenaCalculations {
     }
 
     public static boolean isLocationInsideRobot(Location robot, double robotHeading, Location location) {
-        List<Location> robotEdges = getEdgesFromCenterLocation(robot, robotHeading, ROBOT_CENTER_TO_EDGE + SAFE_TOLERANCE);
+        List<Location> robotEdges = getEdgesFromCenterLocation(robot, robotHeading);
         Path2D robotLimits = new Path2D.Double();
 
         Location leftEdge = ArenaCalculations.getEdge(robotEdges, false, true, true);

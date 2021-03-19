@@ -72,6 +72,10 @@ public class BulletInfo implements Serializable {
         return bullet.getVelocity();
     }
 
+    public Vector getBulletVector() {
+        return ArenaCalculations.angleToUnitVector(getFiredAngle()).scalar(getBulletVelocity());
+    }
+
     /**
      * Given a tick, calculates the position of the bullet in that tick
      * @param targetTick On which tick to determine the bullet position
@@ -84,7 +88,7 @@ public class BulletInfo implements Serializable {
         }
 
         Long ticksPassed = targetTick - getFiredOnTick();
-        Vector bulletVector = ArenaCalculations.angleToUnitVector(getFiredAngle()).scalar(ticksPassed * getBulletVelocity());
+        Vector bulletVector = getBulletVector().setLength(ticksPassed * getBulletVelocity());
         Location currentLocation = bulletVector.apply(getFiredFrom());
 
         // Check if bullet has not collided with walls

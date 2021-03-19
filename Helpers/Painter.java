@@ -43,4 +43,20 @@ public class Painter {
         g2d.setColor(color);
         g2d.drawLine((int) start.getX(), (int) start.getY(), (int) end.getX(), (int) end.getY());
     }
+
+    public static void drawVector(Graphics2D g2d, Color color, Vector vector, Location origin) {
+        Location appliedVector = vector.apply(origin);
+
+        Vector oppositeVector = vector.negative().setLength(vector.length()/6.0);
+        Vector clockwisePerpendicular = vector.perpendicularClockwise().setLength(vector.length()/6.0);
+        Vector counterClockwisePerpendicular = vector.perpendicularCounterClockwise().setLength(vector.length()/6.0);
+
+        Location arrowOne = clockwisePerpendicular.apply(oppositeVector.apply(appliedVector));
+        Location arrowTwo = counterClockwisePerpendicular.apply(oppositeVector.apply(appliedVector));
+
+        g2d.setColor(color);
+        g2d.drawLine((int) appliedVector.getX(), (int) appliedVector.getY(), (int) origin.getX(), (int) origin.getY());
+        g2d.drawLine((int) appliedVector.getX(), (int) appliedVector.getY(), (int) arrowOne.getX(), (int) arrowOne.getY());
+        g2d.drawLine((int) appliedVector.getX(), (int) appliedVector.getY(), (int) arrowTwo.getX(), (int) arrowTwo.getY());
+    }
 }

@@ -29,6 +29,14 @@ public class Vector implements Serializable {
         this.y = p2.getY() - p1.getY();
     }
 
+    public Double getX() {
+        return x;
+    }
+
+    public Double getY() {
+        return y;
+    }
+
     /**
      * Applies the vector to a given location
      * @param location Input location
@@ -88,5 +96,31 @@ public class Vector implements Serializable {
      */
     public Vector add(Vector vector) {
         return new Vector(this.x + vector.x, this.y + vector.y);
+    }
+
+    public double angleWithVector(Vector vector) {
+        return Math.toDegrees(Math.acos((getX()*vector.getX() + getY()*vector.getY()) / (Math.sqrt(Math.pow(getX(), 2) + Math.pow(getY(), 2)) * Math.sqrt(Math.pow(vector.getX(), 2) + Math.pow(vector.getY(), 2)))));
+    }
+
+    public Vector perpendicularClockwise() {
+        return new Vector(y, -x);
+    }
+
+    public Vector perpendicularCounterClockwise() {
+        return new Vector(-y, x);
+    }
+
+    public double arenaAngleOfVector() {
+        Location origin = new Location(0.0, 0.0);
+        Location applyFromOrigin = apply(origin);
+        return ArenaCalculations.angleFromOriginToLocation(origin, applyFromOrigin);
+    }
+
+    public double closestAngleBetweenVectors(Vector otherVector) {
+        double vectorAngle = arenaAngleOfVector();
+        double otherVectorAngle = otherVector.arenaAngleOfVector();
+        double rightAngleOffset = ArenaCalculations.angleDeltaRight(vectorAngle, otherVectorAngle);
+
+        return ArenaCalculations.shortestAngle(rightAngleOffset);
     }
 }

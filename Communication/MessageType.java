@@ -10,6 +10,7 @@ public enum MessageType implements Serializable {
     SCAN_INFO,
     STATUS_INFO,
     GUN_READY_INFO,
+    BOUNTIES_INFO,
     TEAMMATE_REGISTER,
     FIRE_REQUEST,
     MOVE_REQUEST
