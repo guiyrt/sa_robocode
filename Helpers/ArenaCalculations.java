@@ -1,10 +1,8 @@
 package sa_robocode.Helpers;
 
-import java.awt.*;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
@@ -20,7 +18,6 @@ public class ArenaCalculations {
     private static final Double FULL_ROTATION = 360.0;
     private static final Double ROBOT_DIMENSION = 36.0;
     private static final Double ROBOT_CENTER_TO_EDGE = Math.sqrt(Math.pow(ROBOT_DIMENSION/2, 2) + Math.pow(ROBOT_DIMENSION/2, 2));
-    private static final Double SAFE_TOLERANCE = 6.0;
 
     /**
      * Adds a delta angle to an input angle
@@ -123,14 +120,14 @@ public class ArenaCalculations {
         return (angle < reverseAngleOrientation(angle)) ? angle : angle - FULL_ROTATION;
     }
 
-    public static List<Location> getEdgesFromCenterLocation(Location robot, Double heading) {
+    public static List<Location> getEdgesFromCenterLocation(Location robot, Double heading, double tolerance) {
         List<Location> edges = new ArrayList<>();
         double angleDegrees = 90 - ((heading + 45) % 90), deltaX, deltaY;
 
         for (int i=0; i<4; i++) {
             angleDegrees += 90;
-            deltaY = Math.sin(Math.toRadians(angleDegrees)) * (ROBOT_CENTER_TO_EDGE + SAFE_TOLERANCE);
-            deltaX = Math.cos(Math.toRadians(angleDegrees)) * (ROBOT_CENTER_TO_EDGE + SAFE_TOLERANCE);
+            deltaY = Math.sin(Math.toRadians(angleDegrees)) * (ROBOT_CENTER_TO_EDGE + tolerance);
+            deltaX = Math.cos(Math.toRadians(angleDegrees)) * (ROBOT_CENTER_TO_EDGE + tolerance);
 
             edges.add(new Location(robot.getX() + deltaX, robot.getY() + deltaY));
         }
@@ -138,8 +135,8 @@ public class ArenaCalculations {
         return edges;
     }
 
-    public static boolean isLocationInsideRobot(Location robot, double robotHeading, Location location) {
-        List<Location> robotEdges = getEdgesFromCenterLocation(robot, robotHeading);
+    public static boolean isLocationInsideRobot(Location robot, double robotHeading, Location location, double tolerance) {
+        List<Location> robotEdges = getEdgesFromCenterLocation(robot, robotHeading, tolerance);
         Path2D robotLimits = new Path2D.Double();
 
         Location leftEdge = ArenaCalculations.getEdge(robotEdges, false, true, true);

@@ -20,16 +20,24 @@ public class PatternFinder {
 
         // Use last known location as reference
         Location init = list.get(0).getLocation();
+        long lastTick = list.get(0).getScannedRobotEvent().getTime();
+        int counter = 0;
 
-        for (ScanInfo si: list.subList(1, threshold + 1)) {
+        for (ScanInfo si: list.subList(1, list.size())) {
             // If past locations are different, duck is not sitting
-            if (!si.getLocation().sameAs(init)) {
-                return null;
+            if (si.getLocation().sameAs(init)) {
+                if (si.getScannedRobotEvent().getTime() != lastTick) {
+                    counter++;
+                    lastTick = si.getScannedRobotEvent().getTime();
+                }
+            }
+            else {
+                break;
             }
         }
 
         // Check if counter got enough same locations
-        return init;
+        return counter >= threshold ? init : null;
     }
 
     /**
@@ -46,16 +54,7 @@ public class PatternFinder {
 
         ScanInfo p1 = list.get(0);
         ScanInfo p2 = list.get(1);
-        int i = 0;
         int counter = 0;
-
-        for(; (i < list.size()) && (p1.getLocation().sameAs(p2.getLocation())); i++) {
-            p2 = list.get(i);
-        }
-
-        if (p1.getLocation().sameAs(p2.getLocation())) {
-            return null;
-        }
 
         // Find m and b values to get linear equation
         Line line = new Line(p1.getLocation(), p2.getLocation());

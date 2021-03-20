@@ -3,7 +3,6 @@ package sa_robocode.Helpers;
 import sa_robocode.Communication.ScanInfo;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 
 public class Circle implements Serializable {
@@ -48,6 +47,11 @@ public class Circle implements Serializable {
         return radius;
     }
 
+    public double getHeading(ScanInfo lastScan, long tick, double velocity) {
+        Location locationOnTick = getLocationByTick(lastScan, tick, velocity);
+        return new Vector(getCenter(), locationOnTick).perpendicularClockwise().arenaAngleOfVector();
+    }
+
     public boolean isLocationInCircle(Location location) {
         return (location.distanceTo(getCenter()) - getRadius()) < TOLERANCE;
     }
@@ -60,8 +64,8 @@ public class Circle implements Serializable {
     public double getVelocityOrientation(Location lastKnown, Location secondLastKnown, double velocity) {
         return (secondLastKnown.getY() - getCenter().getY()) * (lastKnown.getX() - secondLastKnown.getX()) -
                (secondLastKnown.getX() - getCenter().getX()) * (lastKnown.getY() - secondLastKnown.getY()) > 0 ?
-               Math.abs(velocity) :
-               -Math.abs(velocity);
+               -Math.abs(velocity) :
+               Math.abs(velocity);
     }
 
     public Location getLocationByTick(ScanInfo lastScan, long tick, double velocity) {

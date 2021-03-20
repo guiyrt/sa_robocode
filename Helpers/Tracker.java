@@ -7,15 +7,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Tracker implements Serializable {
-    private static final int DUCK_THRESHOLD = 2;
+    private static final int DUCK_THRESHOLD = 5;
     private static final int CRAB_THRESHOLD = 10;
-    private static final int SHARK_THRESHOLD = 4;
+    private static final int SHARK_THRESHOLD = 6;
 
     private final List<ScanInfo> pings;
     private final String name;
     private TrackerType trackerType;
-    private Circle circle;
-    public Line line;
+    public Circle circle;
+    private Line line;
     private Location stopped;
 
     public Tracker(String name) {
@@ -29,7 +29,10 @@ public class Tracker implements Serializable {
     }
 
     public void addPing(ScanInfo si) {
-        pings.add(0, si);
+        // Adds to pings if list is empty, or it the last ping isn't from the same tick
+        if (pings.size() == 0 || pings.get(0).getScannedRobotEvent().getTime() != si.getScannedRobotEvent().getTime()) {
+            pings.add(0, si);
+        }
     }
 
     public TrackerType getTrackerType() {
@@ -59,19 +62,39 @@ public class Tracker implements Serializable {
         Line crab = PatternFinder.patternCrab(pings, CRAB_THRESHOLD);
         Circle shark = PatternFinder.patternShark(pings, SHARK_THRESHOLD);
 
-        if (crab != null) {
-            trackerType = TrackerType.CRAB;
-            line = crab;
-        }
-        else if (duck != null) {
+        if (duck != null) {
             trackerType = TrackerType.DUCK;
             stopped = duck;
+        }
+        else if (crab != null) {
+            trackerType = TrackerType.CRAB;
+            line = crab;
         }
 
         else if (shark != null) {
             trackerType = TrackerType.SHARK;
             circle = shark;
         }
+    }
+
+    public double getHeading(long tick) {
+        double heading = 0.0;
+
+        switch (trackerType) {
+            case DUCK, NO_PATTERN -> {
+                heading = pings.get(0).getScannedRobotEvent().getHeading();
+            }
+
+            case CRAB -> {
+                heading = line.getHeading();
+            }
+
+            case SHARK -> {
+                heading = circle.getHeading(pings.get(0), tick, pings.get(0).getScannedRobotEvent().getVelocity());
+            }
+        }
+
+        return heading;
     }
 
     public Location getLocationByTick(long tick) {

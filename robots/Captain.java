@@ -42,19 +42,22 @@ public class Captain extends TeamRobot {
 	private final Set<Tracker> mostWanted = new LinkedHashSet<>();
 	private String currentLeader = null;
 	private boolean outOfDateBounties = true;
-	private boolean waitingForBounty = false;
 	private Tracker bounty = null;
+	private Location target = null;
+	private boolean readyToFire = false;
 
 	/**
 	 * Definition of useful static values to access in methods
 	 */
 	private static final int BULLET_ITERATIONS_PREVISION = 9;
-	private static final double AVOID_COLLISION_DISTANCE = 70.0;
+	private static final double AVOID_BULLET_DISTANCE = 70.0;
 	private static final double TEAMMATE_MIN_DISTANCE_TO_FIRE = 215.0;
 	private static final double MAX_POWER_RADIUS = 120.0;
 	private static final double MIN_BULLET_POWER = 0.1;
 	private static final double BULLET_RANGE_DROPOFF = 50.0;
 	private static final double BULLET_POWER_DROPOFF = 0.20;
+	private static final int MAX_SIMULATION_ITERATIONS_ENEMY = 50;
+	private static final double ROBOT_EDGES_DISTANCE_TOLERANCE = 6.0;
 
 
 	/**
@@ -63,15 +66,16 @@ public class Captain extends TeamRobot {
 	public void run() {
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
 		updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy())); // Register in team
+		currentLeader = getName();
 
 		if (getName().contains("3")) {
-			while(true) {
-				goToLocation(new Location(100.0, 100.0));
-				goToLocation(new Location(100.0, 400.0));
-				goToLocation(new Location(100.0, 100.0));
-				goToLocation(new Location(100.0, 400.0));
-				goToLocation(new Location(100.0, 50.0));
+			while (true) {
+				setMaxVelocity(6.0);
+				setAhead(1000);
+				setTurnRight(1000);
+				execute();
 			}
+
 		}
 
 		else {
@@ -85,9 +89,20 @@ public class Captain extends TeamRobot {
 	 */
 	public void onPaint(Graphics2D g2d) {
 		Tracker t = enemiesTracking.get("sa_robocode.robots.Captain* (3)");
+		Location next =t.getLocationByTick(getTime()+1);
 
-		if (t.line != null) {
-			Painter.drawLine(g2d, Color.orange, t.line.getStart(), t.line.getEnd());
+		List<Location> edges = ArenaCalculations.getEdgesFromCenterLocation(next, t.getHeading(getTime()+1), 0);
+
+		for (Location edge: edges) {
+			Painter.drawLocation(g2d, Color.GREEN, edge);
+		}
+
+		System.out.println("NEXT POSITION WILL BE X: " + next.getX() + " Y: " + next.getY());
+
+		if (t.circle != null) {
+			for(int i =0; i<360; i++) {
+				Painter.drawLocation(g2d, Color.orange, ArenaCalculations.polarInfoToLocation(t.circle.getCenter(), (double) i, t.circle.getRadius()));
+			}
 		}
 	}
 
@@ -272,7 +287,7 @@ public class Captain extends TeamRobot {
 			// Check if bullet collided with teammate until bullet passes target location
 			while(new Vector(bullet, location).angleWithVector(bulletVector) != 180) {
 				bullet = bulletVector.apply(bullet);
-				if (ArenaCalculations.isLocationInsideRobot(si.getLocation(), si.getScannedRobotEvent().getHeading(), bullet)) {
+				if (ArenaCalculations.isLocationInsideRobot(si.getLocation(), si.getScannedRobotEvent().getHeading(), bullet, ROBOT_EDGES_DISTANCE_TOLERANCE)) {
 					return true;
 				}
 			}
@@ -295,9 +310,6 @@ public class Captain extends TeamRobot {
 			}
 
 			bounty = tracker;
-
-			fireAndBroadcast(2.0);
-			bounty = null;
 		}
 	}
 
@@ -357,18 +369,20 @@ public class Captain extends TeamRobot {
 
 			// Only leader receives these messages
 			case GUN_READY_INFO -> {
-				// Check if kill order needs to be recalculated
-				if (outOfDateBounties) {
-					orderBounties();
-				}
 
-				sendMessageToTeammate(me.getSender(), new Message(mostWanted));
+				if (amCurrentLeader()) {
+					// Check if kill order needs to be recalculated
+					if (outOfDateBounties) {
+						orderBounties();
+					}
+
+					sendMessageToTeammate(me.getSender(), new Message(mostWanted));
+				}
 			}
 
 			case BOUNTIES_INFO -> {
 				Set<Tracker> mostWanted = message.getBounties();
 				setBounty(mostWanted);
-				waitingForBounty = false;
 			}
 
 			case FIRE_REQUEST -> {
@@ -466,7 +480,59 @@ public class Captain extends TeamRobot {
 		}
 	}
 
+	public boolean simulateGunFire(Tracker tracker, Location target, long currentTick) {
+		Vector motion = ArenaCalculations.angleToUnitVector(getHeading()).setLength(getVelocity());
+		Location simulationLocation = getCurrentLocation();
+		double distance = simulationLocation.distanceTo(target);
+		double power = calculateBulletPower(simulationLocation, target);
+		double bulletVelocity = Rules.getBulletSpeed(power);
+		double simulationGunHeading = getGunHeading();
+		long simulationTick = currentTick;
+		boolean aiming = true;
+
+
+		while (aiming) {
+			Location nextLocation = motion.apply(simulationLocation);
+			double angleToShoot = ArenaCalculations.angleFromOriginToLocation(nextLocation, target);
+			double angleAdjustmentNeeded = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(simulationGunHeading, angleToShoot));
+
+			if (Math.abs(angleAdjustmentNeeded) > Rules.GUN_TURN_RATE) {
+				simulationGunHeading += angleAdjustmentNeeded > 0 ? Rules.GUN_TURN_RATE : -Rules.GUN_TURN_RATE;
+			}
+
+			else {
+				aiming = false;
+				simulationGunHeading += angleAdjustmentNeeded;
+			}
+
+			simulationLocation = nextLocation;
+			simulationTick++;
+		}
+
+		simulationTick++; // Simulate fire
+
+		simulationTick += (long) Math.ceil(distance / bulletVelocity);
+
+
+		//////////////////////////////////////////// TODO : DEBUG
+		if (ArenaCalculations.isLocationInsideRobot(tracker.getLocationByTick(simulationTick), tracker.getHeading(simulationTick), target, 0)) {
+			Location predicted = tracker.getLocationByTick(simulationTick);
+			System.out.println("EXPECTED LOCATION WITH PATTERN " + tracker.getTrackerType() +  " -> X:" + predicted.getX() + " Y:" + predicted.getY());
+		}
+		//////////////////////////////////////////// TODO : DEBUG
+
+		return ArenaCalculations.isLocationInsideRobot(tracker.getLocationByTick(simulationTick), tracker.getHeading(simulationTick), target, 0);
+	}
+
+	public void cleanGun() {
+		bounty = null;
+		target = null;
+		readyToFire = false;
+	}
+
 	public void onStatus(StatusEvent e) {
+		Vector momentumVector = ArenaCalculations.angleToUnitVector(getHeading());
+
 		// Ready to acquire target
 		if (getGunHeat() == 0.0 && bounty == null) {
 			if (amCurrentLeader()) {
@@ -475,17 +541,49 @@ public class Captain extends TeamRobot {
 				}
 
 				setBounty(mostWanted);
-			} else {
+			}
+
+			else {
 				// Inform leader that robot is ready to fire
-				if (!waitingForBounty) {
-					sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
-					waitingForBounty = true;
-				}
+				sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
 			}
 		}
 
+		// Simulate enemy movement to figure out where to shoot
+		if (bounty != null & target == null) {
+			for (int i = 1; i < MAX_SIMULATION_ITERATIONS_ENEMY; i++) {
+				Location enemy = bounty.getLocationByTick(e.getTime() + i);
+				if (simulateGunFire(bounty, enemy, e.getTime())) {
+					target = enemy;
+					break;
+				}
+			}
+
+			if (target == null) {
+				System.out.println("NO CAN DO WITH SIMULATION!!");
+				// TODO: WHAT TO DO IF FAILED SIMULATION?
+			}
+		}
+
+		if (readyToFire && getGunTurnRemaining() == 0) {
+			double power = calculateBulletPower(getCurrentLocation(), target);
+			fireAndBroadcast(power);
+			cleanGun();
+		}
+
+
+		// Start aiming towards target
+		if (target != null) {
+			Location nextLocation = momentumVector.setLength(e.getStatus().getVelocity()).apply(getCurrentLocation());
+			double angleToShoot = ArenaCalculations.angleFromOriginToLocation(nextLocation, target);
+			double angleAdjustmentNeeded = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getGunHeading(), angleToShoot));
+
+			turnGunRight(angleAdjustmentNeeded);
+			readyToFire = true;
+		}
+
+
 		// Check if collision with friendly bullet is imminent
-		Vector momentumVector = ArenaCalculations.angleToUnitVector(getHeading());
 		teamBullets.removeIf(bi -> (bi.getBulletLocation(e.getTime()) == null) || (avoidedBullets.contains(bi)));
 		avoidedBullets.removeIf(bi -> !teamBullets.contains(bi));
 
@@ -494,7 +592,7 @@ public class Captain extends TeamRobot {
 
 			for (BulletInfo bi : teamBullets) {
 				Location nextBulletLocation = bi.getBulletLocation(e.getTime() + i);
-				if (nextBulletLocation != null && ArenaCalculations.isLocationInsideRobot(nextRobotLocation, e.getStatus().getHeading(), nextBulletLocation)) {
+				if (nextBulletLocation != null && ArenaCalculations.isLocationInsideRobot(nextRobotLocation, e.getStatus().getHeading(), nextBulletLocation, ROBOT_EDGES_DISTANCE_TOLERANCE)) {
 					// Robot is in a collision course, calculate in which direction to go
 					Vector bulletVector = bi.getBulletVector();
 					Vector robotVector = ArenaCalculations.angleToUnitVector(e.getStatus().getHeading());
@@ -502,7 +600,7 @@ public class Captain extends TeamRobot {
 
 					// Check if better to move forward of backwards, choose direction vector closest to bullet vector
 					boolean moveForwards = Math.abs(bulletVector.closestAngleBetweenVectors(robotVector)) < Math.abs(bulletVector.closestAngleBetweenVectors(robotBackVector));
-					double distanceToAvoidBullet = moveForwards ? AVOID_COLLISION_DISTANCE : -AVOID_COLLISION_DISTANCE;
+					double distanceToAvoidBullet = moveForwards ? AVOID_BULLET_DISTANCE : -AVOID_BULLET_DISTANCE;
 					Vector generalDirectionVector = moveForwards ? robotVector : robotBackVector;
 
 					// Check closest angle from direction vector to vector perpendicular with bullet vector

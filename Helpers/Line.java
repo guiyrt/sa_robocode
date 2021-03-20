@@ -63,6 +63,10 @@ public class Line implements Serializable {
         return new Vector(getStart(), getEnd());
     }
 
+    public double getHeading() {
+        return new Vector(getStart(), getEnd()).arenaAngleOfVector();
+    }
+
     public boolean isLocationInLine(Location location) {
         boolean locationInLine = Double.isInfinite(getSlope()) ?
                 Math.abs(location.getX() - getStart().getX()) < TOLERANCE :
