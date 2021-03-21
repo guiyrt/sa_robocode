@@ -67,16 +67,7 @@ public class Droid extends TeamRobot implements robocode.Droid {
         setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
         updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy())); // Register in team
         currentLeader = getName();
-        /*
-        if (getName().contains("3")) {
-            while (true) {
-                setMaxVelocity(6.0);
-                setAhead(1000);
-                setTurnRight(1000);
-                execute();
-            }
 
-        }*/
         while (true) {
             //setMaxVelocity(6.0);
             if (noRadars()) {
@@ -470,7 +461,6 @@ public class Droid extends TeamRobot implements robocode.Droid {
      * @param e Resulting HitWallEvent instance
      */
     public void onHitWall(HitWallEvent e) {
-        out.println("parede");
         faceTowards(new Location(getBattleFieldWidth()/2,getBattleFieldHeight()/2));
         ahead(90);
     }
