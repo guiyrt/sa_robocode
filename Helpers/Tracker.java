@@ -7,21 +7,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Tracker implements Serializable {
-    private static final int DUCK_THRESHOLD = 5;
+    private static final int DUCK_THRESHOLD = 3;
     private static final int CRAB_THRESHOLD = 10;
-    private static final int SHARK_THRESHOLD = 6;
+    private static final int SHARK_THRESHOLD = 4;
+    private static final int PROJECTION_MAX_MISSING_DATA_POINTS = 4;
 
     private final List<ScanInfo> pings;
     private final String name;
     private TrackerType trackerType;
-    public Circle circle;
+    private Circle circle;
     private Line line;
     private Location stopped;
+    public Projection projection;
 
     public Tracker(String name) {
         this.pings = new ArrayList<>();
         this.name = name;
-        this.trackerType = TrackerType.NO_PATTERN;
+        this.trackerType = TrackerType.PROJECTION;
     }
 
     public String getName() {
@@ -44,36 +46,50 @@ public class Tracker implements Serializable {
         return pings.get(0).getScannedRobotEvent().getEnergy();
     }
 
+    public Location getLastKnownLocation() {
+        if (pings.size() == 0) return null;
+        return pings.get(0).getLocation();
+    }
+
     public boolean noPings() {
         return pings.stream().findFirst().isEmpty();
     }
 
     public void resetPatterns() {
-        trackerType = TrackerType.NO_PATTERN;
+        this.trackerType = TrackerType.LINEAR;
         this.line = null;
         this.stopped = null;
         this.circle = null;
+        this.projection = null;
     }
 
     public void findPatterns() {
         resetPatterns();
 
         Location duck = PatternFinder.patternSittingDuck(pings, DUCK_THRESHOLD);
-        Line crab = PatternFinder.patternCrab(pings, CRAB_THRESHOLD);
+        Line crab = null;//TODO PatternFinder.patternCrab(pings, CRAB_THRESHOLD);
         Circle shark = PatternFinder.patternShark(pings, SHARK_THRESHOLD);
+        Projection projection = PatternFinder.patternProjection(pings, PROJECTION_MAX_MISSING_DATA_POINTS);
+
 
         if (duck != null) {
             trackerType = TrackerType.DUCK;
-            stopped = duck;
+            this.stopped = duck;
         }
+
         else if (crab != null) {
             trackerType = TrackerType.CRAB;
-            line = crab;
+            this.line = crab;
         }
 
         else if (shark != null) {
             trackerType = TrackerType.SHARK;
-            circle = shark;
+            this.circle = shark;
+        }
+
+        else if (projection != null){
+            trackerType = TrackerType.PROJECTION;
+            this.projection = projection;
         }
     }
 
@@ -81,7 +97,11 @@ public class Tracker implements Serializable {
         double heading = 0.0;
 
         switch (trackerType) {
-            case DUCK, NO_PATTERN -> {
+            case PROJECTION -> {
+                heading = projection.getHeading(tick);
+            }
+
+            case DUCK, LINEAR -> {
                 heading = pings.get(0).getScannedRobotEvent().getHeading();
             }
 
@@ -101,6 +121,11 @@ public class Tracker implements Serializable {
         ScanInfo lastKnown = pings.get(0);
         Location future = null;
 
+        // No projections to the past
+        if (lastKnown.getScannedRobotEvent().getTime() > tick) {
+            return null;
+        }
+
         switch (trackerType) {
             case DUCK -> {
                 future = stopped;
@@ -116,8 +141,11 @@ public class Tracker implements Serializable {
                 future = circle.getLocationByTick(lastKnown, tick, orientationSensitiveVelocity);
             }
 
-            // Linear projection
-            case NO_PATTERN -> {
+            case PROJECTION -> {
+                future = projection.getLocationByTick(tick);
+            }
+
+            case LINEAR -> {
                 future = ArenaCalculations.angleToUnitVector(lastKnown.getScannedRobotEvent().getHeading()).
                         setLength(lastKnown.getScannedRobotEvent().getVelocity() * (tick - lastKnown.getScannedRobotEvent().getTime())).
                         apply(lastKnown.getLocation());

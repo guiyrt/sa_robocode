@@ -6,5 +6,6 @@ public enum TrackerType implements Serializable {
     DUCK,
     CRAB,
     SHARK,
-    NO_PATTERN
+    PROJECTION,
+    LINEAR
 }

@@ -17,7 +17,7 @@ public class ArenaCalculations {
     private static final Double POLAR_TO_ARENA_ANGLE_OFFSET = 90.0;
     private static final Double FULL_ROTATION = 360.0;
     private static final Double ROBOT_DIMENSION = 36.0;
-    private static final Double ROBOT_CENTER_TO_EDGE = Math.sqrt(Math.pow(ROBOT_DIMENSION/2, 2) + Math.pow(ROBOT_DIMENSION/2, 2));
+    public static final Double ROBOT_CENTER_TO_EDGE = Math.sqrt(Math.pow(ROBOT_DIMENSION/2, 2) + Math.pow(ROBOT_DIMENSION/2, 2));
 
     /**
      * Adds a delta angle to an input angle

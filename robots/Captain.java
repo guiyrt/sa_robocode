@@ -4,6 +4,8 @@ import sa_robocode.Communication.*;
 import sa_robocode.Helpers.*;
 import sa_robocode.Helpers.PatternFinder;
 import sa_robocode.Helpers.Circle;
+import sa_robocode.Helpers.Projection;
+import sa_robocode.Helpers.Line;
 import robocode.*;
 import sa_robocode.Helpers.Vector;
 
@@ -35,16 +37,22 @@ public class Captain extends TeamRobot {
 	 * Definition of data structures to aid determination of robot behavior
 	 */
 	private final Map<String, Tracker> enemiesTracking = new HashMap<>();
+	private final Map<String, Boolean> enemyDroids = new HashMap<>();
 	private final Map<String, ScanInfo> teammatesTracking = new HashMap<>();
 	private final Map<String, TeammateInfo> teamStatus = new HashMap<>();
 	private final List<BulletInfo> teamBullets = new ArrayList<>();
 	private final List<BulletInfo> avoidedBullets = new ArrayList<>();
 	private final Set<Tracker> mostWanted = new LinkedHashSet<>();
+	private ArenaNavigation gps = null;
+	private MotionType motion = MotionType.READY_TO_MOVE;
+	private Location destination = null;
 	private String currentLeader = null;
 	private boolean outOfDateBounties = true;
 	private Tracker bounty = null;
 	private Location target = null;
 	private boolean readyToFire = false;
+	private double lastHeading = 0;
+	private double lastVelocity = 0;
 
 	/**
 	 * Definition of useful static values to access in methods
@@ -56,31 +64,28 @@ public class Captain extends TeamRobot {
 	private static final double MIN_BULLET_POWER = 0.1;
 	private static final double BULLET_RANGE_DROPOFF = 50.0;
 	private static final double BULLET_POWER_DROPOFF = 0.20;
-	private static final int MAX_SIMULATION_ITERATIONS_ENEMY = 50;
+	private static final int MAX_SIMULATION_ITERATIONS_ENEMY = 100;
 	private static final double ROBOT_EDGES_DISTANCE_TOLERANCE = 6.0;
+	private static final double CRITICAL_ENERGY_LEVEL = 50.0;
 
 
 	/**
 	 * Main method with robot behavior.
 	 */
 	public void run() {
+		gps = new ArenaNavigation(enemiesTracking, teammatesTracking, getBattleFieldWidth(), getBattleFieldHeight());
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
 		updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy())); // Register in team
+		lastHeading = getHeading();
+		lastVelocity = getVelocity();
 		currentLeader = getName();
 
-		if (getName().contains("3")) {
-			while (true) {
-				setMaxVelocity(6.0);
-				setAhead(1000);
-				setTurnRight(1000);
-				execute();
+/*		while (true) {
+			if (motion == MotionType.READY_TO_MOVE) {
+				destination = gps.getNextDestination();
+				motion = MotionType.DESTINATION_SET;
 			}
-
-		}
-
-		else {
-			setTurnRadarLeft(90000);
-		}
+		}*/
 	}
 
 	/**
@@ -88,22 +93,75 @@ public class Captain extends TeamRobot {
 	 * @param g2d Graphics2D instance from robocode instance
 	 */
 	public void onPaint(Graphics2D g2d) {
-		Tracker t = enemiesTracking.get("sa_robocode.robots.Captain* (3)");
-		Location next =t.getLocationByTick(getTime()+1);
-
-		List<Location> edges = ArenaCalculations.getEdgesFromCenterLocation(next, t.getHeading(getTime()+1), 0);
-
-		for (Location edge: edges) {
-			Painter.drawLocation(g2d, Color.GREEN, edge);
+		if (destination != null) {
+			Painter.drawLocation(g2d, Color.red, destination);
 		}
 
-		System.out.println("NEXT POSITION WILL BE X: " + next.getX() + " Y: " + next.getY());
+		Vector heading = ArenaCalculations.angleToUnitVector(getHeading()).setLength(2000);
 
-		if (t.circle != null) {
-			for(int i =0; i<360; i++) {
-				Painter.drawLocation(g2d, Color.orange, ArenaCalculations.polarInfoToLocation(t.circle.getCenter(), (double) i, t.circle.getRadius()));
+		Painter.drawLine(g2d, Color.cyan, getCurrentLocation(), heading.apply(getCurrentLocation()));
+
+		for (ScanInfo si: teammatesTracking.values()) {
+			for (int i=0; i<360; i++) {
+				Painter.drawLocation(g2d, Color.MAGENTA, ArenaCalculations.polarInfoToLocation(si.getLocation(), (double) i, 100.0));
 			}
 		}
+
+		for (Tracker l: enemiesTracking.values()) {
+			for (int i=0; i<360; i++) {
+				Painter.drawLocation(g2d, Color.PINK, ArenaCalculations.polarInfoToLocation(l.getLastKnownLocation(), (double) i, 60.0));
+			}
+		}
+
+		for (int i=0; i<360; i++) {
+			Painter.drawLocation(g2d, Color.yellow, ArenaCalculations.polarInfoToLocation(getCurrentLocation(), (double) i, 400.0));
+		}
+
+		/*if (getName().contains("1")) {
+*//*			Tracker t = enemiesTracking.get("sa_robocode.robots.Captain* (3)");
+
+			if (t != null) {
+				Line l = t.line;
+
+				Painter.drawLine(g2d, Color.orange, l.getStart(), l.getEnd());
+
+
+				System.out.println(t.getTrackerType());
+			}*//*
+		}
+
+		else if (getName().contains("3")) {
+*//*			Vector gun = ArenaCalculations.angleToUnitVector(getGunHeading());
+			Painter.drawLine(g2d, Color.red, getCurrentLocation(), gun.setLength(1000.0).apply(getCurrentLocation()));
+
+			double headingDiff = getHeading() - lastHeading;
+			Location l = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), (getHeading() + headingDiff) % 360, getVelocity());
+			List<Location> edges = ArenaCalculations.getEdgesFromCenterLocation(l, (getHeading() + headingDiff) % 360, 0);
+
+			for (Location edge: edges) {
+				Painter.drawLocation(g2d, Color.GREEN, edge);
+			}*//*
+		}*/
+	}
+
+	public boolean hasEnemyRadar(String name) {
+		return enemyDroids.containsKey(name) && !enemyDroids.get(name);
+	}
+
+	public boolean hasCriticalEnergyLevel(Tracker t) {
+		return  t.getLastKnownEnergy() <= CRITICAL_ENERGY_LEVEL;
+	}
+
+	public void prepareToMostWanted(List<Tracker> list) {
+		List<Tracker> hasRadar = list.stream().filter(tracker -> hasEnemyRadar(tracker.getName())).collect(Collectors.toList());
+		List<Tracker> criticalDamaged = list.stream().filter(this::hasCriticalEnergyLevel).collect(Collectors.toList());
+
+		// First add critical damaged opponents
+		mostWanted.addAll(criticalDamaged);
+		// Then those with radar
+		mostWanted.addAll(hasRadar);
+		// And at last, the rest
+		mostWanted.addAll(list);
 	}
 
 	public void orderBounties() {
@@ -116,22 +174,27 @@ public class Captain extends TeamRobot {
 		// First priority, stopped robots
 		List<Tracker> ducks = enemiesTracking.values().stream().filter(tracker -> tracker.getTrackerType() == TrackerType.DUCK)
 				.sorted(Comparator.comparingDouble(Tracker::getLastKnownEnergy)).collect(Collectors.toList());
-		mostWanted.addAll(ducks);
+		prepareToMostWanted(ducks);
 
 		// Second priority, robots moving in circles
 		List<Tracker> sharks = enemiesTracking.values().stream().filter(tracker -> tracker.getTrackerType() == TrackerType.SHARK)
 				.sorted(Comparator.comparingDouble(Tracker::getLastKnownEnergy)).collect(Collectors.toList());
-		mostWanted.addAll(sharks);
+		prepareToMostWanted(sharks);
 
 		// Third priority, robots moving in a straight line
 		List<Tracker> crabs = enemiesTracking.values().stream().filter(tracker -> tracker.getTrackerType() == TrackerType.CRAB)
 				.sorted(Comparator.comparingDouble(Tracker::getLastKnownEnergy)).collect(Collectors.toList());
-		mostWanted.addAll(crabs);
+		prepareToMostWanted(crabs);
 
-		// Fourth priority, robot energy left
+		// Fourth priority, robots with consecutive data points (data without much information gaps)
+		List<Tracker> projections = enemiesTracking.values().stream().filter(tracker -> tracker.getTrackerType() == TrackerType.PROJECTION)
+				.sorted(Comparator.comparingDouble(Tracker::getLastKnownEnergy)).collect(Collectors.toList());
+		prepareToMostWanted(projections);
+
+		// Fifth priority, robot energy left
 		List<Tracker> weaker = enemiesTracking.values().stream().filter(tracker -> !mostWanted.contains(tracker))
 				.sorted(Comparator.comparingDouble(Tracker::getLastKnownEnergy)).collect(Collectors.toList());
-		mostWanted.addAll(weaker);
+		prepareToMostWanted(weaker);
 
 		// Bounties are now updated
 		outOfDateBounties = false;
@@ -218,6 +281,9 @@ public class Captain extends TeamRobot {
 	 * @param si ScanInfo regarding the scanned robot
 	 */
 	public void processScanInfo(ScanInfo si) {
+		// Most wanted needs to be recalculated
+		outOfDateBounties = true;
+
 		String name = si.getScannedRobotEvent().getName();
 
 		// No use for information about itself
@@ -233,6 +299,9 @@ public class Captain extends TeamRobot {
 			// Check if enemy was already detected before
 			if (!enemiesTracking.containsKey(name)) {
 				enemiesTracking.put(name, new Tracker(name));
+
+				// Check if first scan of enemy has over 100 energy points, because droids have 120
+				enemyDroids.put(name, si.getScannedRobotEvent().getEnergy() > 100);
 			}
 
 			// Add last tracked location to head of list
@@ -310,6 +379,7 @@ public class Captain extends TeamRobot {
 			}
 
 			bounty = tracker;
+			break;
 		}
 	}
 
@@ -357,9 +427,6 @@ public class Captain extends TeamRobot {
 			case SCAN_INFO -> {
 				ScanInfo si = message.getScanInfo();
 				processScanInfo(si);
-
-				// Most wanted needs to be recalculated
-				outOfDateBounties = true;
 			}
 
 			case BULLET_INFO -> {
@@ -463,7 +530,7 @@ public class Captain extends TeamRobot {
 
 			// Might be necessary a new leader election
 			if (name.equals(currentLeader)) {
-				if (teamStatus.keySet().size() > 0) {
+				if (teamStatus.keySet().size() > 1) {
 					updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy()));
 				}
 
@@ -480,46 +547,42 @@ public class Captain extends TeamRobot {
 		}
 	}
 
-	public boolean simulateGunFire(Tracker tracker, Location target, long currentTick) {
-		Vector motion = ArenaCalculations.angleToUnitVector(getHeading()).setLength(getVelocity());
+	public boolean simulateGunFire(Tracker tracker, Location target, long currentTick, double headingDiff, double acceleration) {
 		Location simulationLocation = getCurrentLocation();
 		double distance = simulationLocation.distanceTo(target);
 		double power = calculateBulletPower(simulationLocation, target);
 		double bulletVelocity = Rules.getBulletSpeed(power);
-		double simulationGunHeading = getGunHeading();
+		double simulatedHeading = getHeading();
+		double simulatedGunHeading = getGunHeading();
+		double simulatedVelocity = getVelocity();
 		long simulationTick = currentTick;
 		boolean aiming = true;
 
 
 		while (aiming) {
-			Location nextLocation = motion.apply(simulationLocation);
+			simulatedHeading = (simulatedHeading + headingDiff) % 360;
+			simulatedVelocity = acceleration > 0 ? Math.min(simulatedVelocity + acceleration, 8.0) : Math.max(simulatedVelocity + acceleration, 0);
+
+			Location nextLocation = ArenaCalculations.polarInfoToLocation(simulationLocation, simulatedHeading + headingDiff, simulatedVelocity);
 			double angleToShoot = ArenaCalculations.angleFromOriginToLocation(nextLocation, target);
-			double angleAdjustmentNeeded = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(simulationGunHeading, angleToShoot));
+			double angleAdjustmentNeeded = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(simulatedGunHeading + headingDiff, angleToShoot));
 
 			if (Math.abs(angleAdjustmentNeeded) > Rules.GUN_TURN_RATE) {
-				simulationGunHeading += angleAdjustmentNeeded > 0 ? Rules.GUN_TURN_RATE : -Rules.GUN_TURN_RATE;
+				angleAdjustmentNeeded = angleAdjustmentNeeded > 0 ? Rules.GUN_TURN_RATE : -Rules.GUN_TURN_RATE;
 			}
 
 			else {
 				aiming = false;
-				simulationGunHeading += angleAdjustmentNeeded;
 			}
 
 			simulationLocation = nextLocation;
+			simulatedGunHeading = (simulatedGunHeading + angleAdjustmentNeeded) % 360;
 			simulationTick++;
 		}
 
 		simulationTick++; // Simulate fire
 
 		simulationTick += (long) Math.ceil(distance / bulletVelocity);
-
-
-		//////////////////////////////////////////// TODO : DEBUG
-		if (ArenaCalculations.isLocationInsideRobot(tracker.getLocationByTick(simulationTick), tracker.getHeading(simulationTick), target, 0)) {
-			Location predicted = tracker.getLocationByTick(simulationTick);
-			System.out.println("EXPECTED LOCATION WITH PATTERN " + tracker.getTrackerType() +  " -> X:" + predicted.getX() + " Y:" + predicted.getY());
-		}
-		//////////////////////////////////////////// TODO : DEBUG
 
 		return ArenaCalculations.isLocationInsideRobot(tracker.getLocationByTick(simulationTick), tracker.getHeading(simulationTick), target, 0);
 	}
@@ -531,7 +594,58 @@ public class Captain extends TeamRobot {
 	}
 
 	public void onStatus(StatusEvent e) {
-		Vector momentumVector = ArenaCalculations.angleToUnitVector(getHeading());
+		System.out.println(getTime() + " " + motion);
+
+		double headingDiff = ArenaCalculations.shortestAngle(e.getStatus().getHeading() - lastHeading);
+		double acceleration = e.getStatus().getVelocity() - lastVelocity;
+		Vector momentumVector = ArenaCalculations.angleToUnitVector(e.getStatus().getHeading());
+
+		// Keep radar spinning
+		setTurnRadarLeft(Rules.RADAR_TURN_RATE);
+
+		// Check if is avoiding bullet
+		if (motion != MotionType.AVOIDING_BULLET) {
+			if (motion == MotionType.READY_TO_MOVE && gps != null) {
+				destination = gps.getNextDestination(getCurrentLocation());
+				motion = MotionType.MAKING_TURN;
+			}
+
+			// Keep moving to destination
+			if ((motion == MotionType.GOING_TO_DESTINATION) && (getCurrentLocation().distanceTo(destination) < 20)) {
+				motion = MotionType.READY_TO_MOVE;
+			}
+
+			if ((motion == MotionType.GOING_TO_DESTINATION) && (getTurnRemaining() == 0)) {
+				setMaxVelocity(Rules.MAX_VELOCITY);
+				setAhead(getCurrentLocation().distanceTo(destination));
+			}
+
+			if (motion == MotionType.MAKING_TURN) {
+				double nextHeading = (getHeading() + headingDiff) % 360;
+				double nextVelocity = acceleration > 0 ? Math.min(e.getStatus().getVelocity() + acceleration, Rules.MAX_VELOCITY) : Math.max(e.getStatus().getVelocity() + acceleration, 0);
+
+				Location nextLocation = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), ArenaCalculations.convertAngleToPolarOrArena(nextHeading), nextVelocity);
+				double angleToDestination = ArenaCalculations.angleFromOriginToLocation(nextLocation, destination);
+				double angleDelta = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(nextHeading, angleToDestination));
+				double maxTurn = Rules.MAX_TURN_RATE - (0.75 * nextVelocity);
+
+				if (Math.abs(angleDelta) > maxTurn) {
+					setMaxVelocity(6.5);
+					angleDelta = angleDelta > 0 ? maxTurn : -maxTurn;
+				}
+
+				else {
+					motion = MotionType.GOING_TO_DESTINATION;
+				}
+
+				setTurnRight(angleDelta);
+				setAhead(50);
+			}
+		}
+
+		else if ((getTurnRemaining() == 0) && (getDistanceRemaining() == 0)) {
+			motion = MotionType.READY_TO_MOVE;
+		}
 
 		// Ready to acquire target
 		if (getGunHeat() == 0.0 && bounty == null) {
@@ -550,12 +664,27 @@ public class Captain extends TeamRobot {
 		}
 
 		// Simulate enemy movement to figure out where to shoot
-		if (bounty != null & target == null) {
+		if (bounty != null & target == null & (motion != MotionType.AVOIDING_BULLET)) {
+			// Running simulations with enemy position prediction, considering this robot's heading variation
+			// AKA, considering moving in a curve, variable speed
 			for (int i = 1; i < MAX_SIMULATION_ITERATIONS_ENEMY; i++) {
 				Location enemy = bounty.getLocationByTick(e.getTime() + i);
-				if (simulateGunFire(bounty, enemy, e.getTime())) {
+				execute();
+				if (simulateGunFire(bounty, enemy, e.getTime(), headingDiff, acceleration)) {
 					target = enemy;
 					break;
+				}
+			}
+
+			// If no target was found, re-run simulations, this time ignoring this robot's heading variation and acceleration
+			// AKA, considering moving in straight line, constant speed
+			if (target == null && headingDiff != 0) {
+				for (int i = 1; i < MAX_SIMULATION_ITERATIONS_ENEMY; i++) {
+					Location enemy = bounty.getLocationByTick(e.getTime() + i);
+					if (simulateGunFire(bounty, enemy, e.getTime(), 0, 0)) {
+						target = enemy;
+						break;
+					}
 				}
 			}
 
@@ -563,6 +692,7 @@ public class Captain extends TeamRobot {
 				System.out.println("NO CAN DO WITH SIMULATION!!");
 				// TODO: WHAT TO DO IF FAILED SIMULATION?
 			}
+
 		}
 
 		if (readyToFire && getGunTurnRemaining() == 0) {
@@ -571,17 +701,26 @@ public class Captain extends TeamRobot {
 			cleanGun();
 		}
 
-
 		// Start aiming towards target
 		if (target != null) {
-			Location nextLocation = momentumVector.setLength(e.getStatus().getVelocity()).apply(getCurrentLocation());
+			Location nextLocation = ArenaCalculations.polarInfoToLocation(getCurrentLocation(), ArenaCalculations.convertAngleToPolarOrArena(getHeading() + headingDiff), e.getStatus().getVelocity());
 			double angleToShoot = ArenaCalculations.angleFromOriginToLocation(nextLocation, target);
-			double angleAdjustmentNeeded = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getGunHeading(), angleToShoot));
+			double angleAdjustmentNeeded = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getGunHeading() + headingDiff, angleToShoot));
 
-			turnGunRight(angleAdjustmentNeeded);
-			readyToFire = true;
+			if (Math.abs(angleAdjustmentNeeded) > Rules.GUN_TURN_RATE) {
+				angleAdjustmentNeeded =  angleAdjustmentNeeded > 0 ? Rules.GUN_TURN_RATE : -Rules.GUN_TURN_RATE;
+			}
+
+			else {
+				readyToFire = true;
+			}
+
+			setTurnGunRight(angleAdjustmentNeeded);
 		}
 
+		// Update last values
+		lastHeading = e.getStatus().getHeading();
+		lastVelocity = e.getStatus().getVelocity();
 
 		// Check if collision with friendly bullet is imminent
 		teamBullets.removeIf(bi -> (bi.getBulletLocation(e.getTime()) == null) || (avoidedBullets.contains(bi)));
@@ -594,6 +733,8 @@ public class Captain extends TeamRobot {
 				Location nextBulletLocation = bi.getBulletLocation(e.getTime() + i);
 				if (nextBulletLocation != null && ArenaCalculations.isLocationInsideRobot(nextRobotLocation, e.getStatus().getHeading(), nextBulletLocation, ROBOT_EDGES_DISTANCE_TOLERANCE)) {
 					// Robot is in a collision course, calculate in which direction to go
+					motion = MotionType.AVOIDING_BULLET;
+
 					Vector bulletVector = bi.getBulletVector();
 					Vector robotVector = ArenaCalculations.angleToUnitVector(e.getStatus().getHeading());
 					Vector robotBackVector = robotVector.negative();
