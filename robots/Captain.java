@@ -69,9 +69,9 @@ public class Captain extends TeamRobot {
 	private static final int MAX_SIMULATION_ITERATIONS_ENEMY = 100;
 	private static final double ROBOT_EDGES_DISTANCE_TOLERANCE = 6.0;
 	private static final double CRITICAL_ENERGY_LEVEL = 50.0;
-	private static final double PROBABILITY_OF_SPONTANEOUS_TURN = 0.10;
-	private static final double PROBABILITY_OF_SPONTANEOUS_SPEED_LIMITATION = 0.2;
-	private static final double PROBABILITY_OF_SPONTANEOUS_REVERSING = 0.15;
+	private static final double PROBABILITY_OF_SPONTANEOUS_TURN = 0.0;//0.10;
+	private static final double PROBABILITY_OF_SPONTANEOUS_SPEED_LIMITATION = 0.0;//0.2;
+	private static final double PROBABILITY_OF_SPONTANEOUS_REVERSING = 0.0;//0.15;
 	private static final long SPONTANEOUS_ACTION_COOLDOWN = 5;
 
 
@@ -96,27 +96,37 @@ public class Captain extends TeamRobot {
 			Painter.drawLocation(g2d, Color.red, destination);
 		}
 
-		double maxTurn = Rules.MAX_TURN_RATE - (0.75 * getVelocity());
-		Vector maxHeadingDiff = ArenaCalculations.angleToUnitVector(getHeading() + maxTurn).setLength(2000);
-		Vector heading = ArenaCalculations.angleToUnitVector(getHeading()).setLength(2000);
-
-		Painter.drawLine(g2d, Color.cyan, getCurrentLocation(), heading.apply(getCurrentLocation()));
-		Painter.drawLine(g2d, Color.green, getCurrentLocation(), maxHeadingDiff.apply(getCurrentLocation()));
+/*		for (int i=0; i<360; i+=2) {
+			Painter.drawLocation(g2d, Color.yellow, ArenaCalculations.polarInfoToLocation(new Location(getBattleFieldWidth()/2, getBattleFieldHeight()/2), (double) i, 150.0));
+		}
 
 		for (Location l: teammatesTracking.values()) {
 			for (int i=0; i<360; i+=2) {
-				Painter.drawLocation(g2d, Color.MAGENTA, ArenaCalculations.polarInfoToLocation(l, (double) i, 100.0));
+				Painter.drawLocation(g2d, Color.MAGENTA, ArenaCalculations.polarInfoToLocation(l, (double) i, 50.0));
 			}
 		}
 
 		for (Tracker l: enemiesTracking.values()) {
 			for (int i=0; i<360; i+=2) {
-				Painter.drawLocation(g2d, Color.PINK, ArenaCalculations.polarInfoToLocation(l.getLastKnownLocation(), (double) i, 60.0));
+				Painter.drawLocation(g2d, Color.yellow, ArenaCalculations.polarInfoToLocation(l.getLastKnownLocation(), (double) i, 50.0));
 			}
 		}
 
 		for (int i=0; i<360; i+=2) {
-			Painter.drawLocation(g2d, Color.yellow, ArenaCalculations.polarInfoToLocation(getCurrentLocation(), (double) i, 250.0));
+			Painter.drawLocation(g2d, Color.yellow, ArenaCalculations.polarInfoToLocation(getCurrentLocation(), (double) i, 100.0));
+		}*/
+
+		if (gps != null) {
+			double maxX = gps.getXMaxAllowedZone(getCurrentLocation());
+			double maxY = gps.getYMaxAllowedZone(getCurrentLocation());
+			double minX = gps.getXMinAllowedZone(getCurrentLocation());
+			double minY = gps.getYMinAllowedZone(getCurrentLocation());
+
+			Painter.drawLine(g2d, Color.orange, new Location(minX, minY), new Location(maxX, minY));
+			Painter.drawLine(g2d, Color.orange, new Location(maxX, minY), new Location(maxX, maxY));
+			Painter.drawLine(g2d, Color.orange, new Location(maxX, maxY), new Location(minX, maxY));
+			Painter.drawLine(g2d, Color.orange, new Location(minX, maxY), new Location(minX, minY));
+
 		}
 	}
 
@@ -585,8 +595,36 @@ public class Captain extends TeamRobot {
 		// Keep radar spinning
 		setTurnRadarLeft(Rules.RADAR_TURN_RATE);
 
+		System.out.println(motion);
+
 		// Check if is avoiding bullet
 		if (motion != MotionType.AVOIDING_BULLET) {
+			if (motion != MotionType.AVOIDING_WALL && gps != null && gps.tooCloseToWalls(getCurrentLocation())) {
+				motion = MotionType.AVOIDING_WALL;
+
+				double angleToCenter = ArenaCalculations.angleFromOriginToLocation(getCurrentLocation(),new Location(getBattleFieldWidth()/2.0, getBattleFieldHeight()/2.0));
+				double heading = getHeading();
+				double buttHeading = (heading + 180) % 360;
+
+				double angleDeltaHeadingToCenter = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(heading, angleToCenter));
+				double angleDeltaButtHeadingToCenter = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(buttHeading, angleToCenter));
+
+				if (Math.abs(angleDeltaHeadingToCenter) > Math.abs(angleDeltaButtHeadingToCenter)) {
+					setTurnRight(ArenaCalculations.shortestAngle(buttHeading+180));
+					setAhead(-100);
+				}
+
+				else {
+					setTurnRight(angleDeltaHeadingToCenter);
+					setAhead(100);
+				}
+
+			}
+
+			if (motion == MotionType.AVOIDING_WALL && getTurnRemaining() == 0 && getVelocity() == 0) {
+				motion = MotionType.READY_TO_MOVE;
+			}
+
 			if (motion == MotionType.READY_TO_MOVE && gps != null) {
 				destination = gps.getNextDestination(getCurrentLocation());
 				motion = MotionType.MAKING_TURN;
@@ -617,6 +655,9 @@ public class Captain extends TeamRobot {
 			}
 
 			if ((motion == MotionType.GOING_TO_DESTINATION) && (getTurnRemaining() == 0)) {
+				setMaxVelocity(Rules.MAX_VELOCITY);
+				setAhead(getCurrentLocation().distanceTo(destination));
+
 				if (e.getTime() - lastSpontaneousAction >= SPONTANEOUS_ACTION_COOLDOWN) {
 					if (ThreadLocalRandom.current().nextDouble() <= PROBABILITY_OF_SPONTANEOUS_TURN) {
 						double turnAngle = ThreadLocalRandom.current().nextDouble(-180, 180);
@@ -634,11 +675,6 @@ public class Captain extends TeamRobot {
 						motion = MotionType.SPONTANEOUS_REVERSE;
 
 					}
-				}
-
-				else {
-					setMaxVelocity(Rules.MAX_VELOCITY);
-					setAhead(getCurrentLocation().distanceTo(destination));
 				}
 			}
 
@@ -674,12 +710,12 @@ public class Captain extends TeamRobot {
 					orderBounties();
 				}
 
-				setBounty(mostWanted);
+				//TODO setBounty(mostWanted);
 			}
 
 			else {
 				// Inform leader that robot is ready to fire
-				sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
+				//TODO sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
 			}
 		}
 
