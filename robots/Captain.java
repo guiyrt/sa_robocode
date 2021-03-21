@@ -549,6 +549,10 @@ public class Captain extends TeamRobot {
 		double acceleration = e.getStatus().getVelocity() - lastVelocity;
 		Vector momentumVector = ArenaCalculations.angleToUnitVector(e.getStatus().getHeading());
 
+		if (motion != MotionType.SPONTANEOUS_SPEED_LIMIT) {
+			setMaxVelocity(Rules.MAX_VELOCITY);
+		}
+
 		// Update teammates of current location
 		sendMessageToTeam(new Message(getCurrentLocation()));
 
@@ -679,7 +683,6 @@ public class Captain extends TeamRobot {
 		}
 
 		else {
-			System.out.println(Math.abs(getTurnRemaining()) + " " + Math.abs(getDistanceRemaining()));
 			if ((Math.abs(getTurnRemaining()) < 1 ) && (Math.abs(getDistanceRemaining()) < 1)) {
 				motion = MotionType.READY_TO_MOVE;
 			}

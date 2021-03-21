@@ -460,6 +460,10 @@ public class Droid extends TeamRobot implements robocode.Droid {
         sendMessageToTeam(new Message(getCurrentLocation()));
 
         // Check if is avoiding bullet
+        if (motion != MotionType.SPONTANEOUS_SPEED_LIMIT) {
+            setMaxVelocity(Rules.MAX_VELOCITY);
+        }
+
         if (motion != MotionType.AVOIDING_BULLET) {
             if (motion != MotionType.AVOIDING_WALL && gps != null && gps.tooCloseToWalls(getCurrentLocation())) {
                 motion = MotionType.AVOIDING_WALL;
@@ -583,7 +587,6 @@ public class Droid extends TeamRobot implements robocode.Droid {
         }
 
         else {
-            System.out.println(Math.abs(getTurnRemaining()) + " " + Math.abs(getDistanceRemaining()));
             if ((Math.abs(getTurnRemaining()) < 1 ) && (Math.abs(getDistanceRemaining()) < 1)) {
                 motion = MotionType.READY_TO_MOVE;
             }
