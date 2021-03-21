@@ -7,9 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Tracker implements Serializable {
+    private static final int MAX_PINGS = 50;
     private static final int DUCK_THRESHOLD = 3;
     private static final int CRAB_THRESHOLD = 10;
-    private static final int SHARK_THRESHOLD = 4;
+    private static final int SHARK_THRESHOLD = 6;
     private static final int PROJECTION_MAX_MISSING_DATA_POINTS = 4;
 
     private final List<ScanInfo> pings;
@@ -33,12 +34,10 @@ public class Tracker implements Serializable {
     public void addPing(ScanInfo si) {
         // Adds to pings if list is empty, or it the last ping isn't from the same tick
         if (pings.size() == 0 || pings.get(0).getScannedRobotEvent().getTime() != si.getScannedRobotEvent().getTime()) {
-            if(pings.size()>=50) {
+            if (pings.size() >= MAX_PINGS) {
                 pings.remove(pings.size()-1);
-                pings.add(0, si);
-            }else{
-                pings.add(0, si);
             }
+            pings.add(0, si);
         }
     }
 
@@ -72,7 +71,7 @@ public class Tracker implements Serializable {
         resetPatterns();
 
         Location duck = PatternFinder.patternSittingDuck(pings, DUCK_THRESHOLD);
-        Line crab = null;//TODO PatternFinder.patternCrab(pings, CRAB_THRESHOLD);
+        Line crab = null;//TODO: CRAB IS BUGGY, DO NOT UNCOMMENT PatternFinder.patternCrab(pings, CRAB_THRESHOLD);
         Circle shark = PatternFinder.patternShark(pings, SHARK_THRESHOLD);
         Projection projection = PatternFinder.patternProjection(pings, PROJECTION_MAX_MISSING_DATA_POINTS);
 

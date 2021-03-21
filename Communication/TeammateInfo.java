@@ -17,9 +17,11 @@ public class TeammateInfo implements Serializable {
         this.robotType = robotType;
         this.energy = energy;
 
-        switch (robotType) {
-            case CAPTAIN -> leaderPriority = CAPTAIN_PRIORITY;
-            default -> leaderPriority = NOT_SUITABLE_FOR_LEADERSHIP;
+        if (robotType == RobotType.CAPTAIN) {
+            leaderPriority = CAPTAIN_PRIORITY;
+        } else {
+            // Droid goes here
+            leaderPriority = NOT_SUITABLE_FOR_LEADERSHIP;
         }
     }
 

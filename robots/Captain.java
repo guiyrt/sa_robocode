@@ -69,9 +69,9 @@ public class Captain extends TeamRobot {
 	private static final int MAX_SIMULATION_ITERATIONS_ENEMY = 100;
 	private static final double ROBOT_EDGES_DISTANCE_TOLERANCE = 6.0;
 	private static final double CRITICAL_ENERGY_LEVEL = 50.0;
-	private static final double PROBABILITY_OF_SPONTANEOUS_TURN = 0.0;//0.10;
-	private static final double PROBABILITY_OF_SPONTANEOUS_SPEED_LIMITATION = 0.0;//0.2;
-	private static final double PROBABILITY_OF_SPONTANEOUS_REVERSING = 0.0;//0.15;
+	private static final double PROBABILITY_OF_SPONTANEOUS_TURN = 0.10;
+	private static final double PROBABILITY_OF_SPONTANEOUS_SPEED_LIMITATION = 0.2;
+	private static final double PROBABILITY_OF_SPONTANEOUS_REVERSING = 0.05;
 	private static final long SPONTANEOUS_ACTION_COOLDOWN = 5;
 
 
@@ -85,6 +85,8 @@ public class Captain extends TeamRobot {
 		lastHeading = getHeading();
 		lastVelocity = getVelocity();
 		currentLeader = getName();
+
+		goToLocation(new Location(0.0, 300.0));
 	}
 
 	/**
@@ -93,7 +95,9 @@ public class Captain extends TeamRobot {
 	 */
 	public void onPaint(Graphics2D g2d) {
 		if (destination != null) {
-			Painter.drawLocation(g2d, Color.red, destination);
+			for (int i=0; i<360; i+=2) {
+				Painter.drawLocation(g2d, Color.green, ArenaCalculations.polarInfoToLocation(destination, (double) i, 50.0));
+			}
 		}
 
 /*		for (int i=0; i<360; i+=2) {
@@ -322,6 +326,8 @@ public class Captain extends TeamRobot {
 		}
 
 		currentLeader = leader;
+
+		System.out.println(getTime() + " NEW LEADER IS " + leader);
 	}
 
 	public boolean amCurrentLeader() {
@@ -481,33 +487,28 @@ public class Captain extends TeamRobot {
 		processScanInfo(si);
 	}
 
-	/**
-	 * Override onHitByBullet to define behavior when hit by bullet
-	 * @param e Resulting HitByBulletEvent instance
-	 */
-	public void onHitByBullet(HitByBulletEvent e) {
-
-	}
 
 	/**
 	 * Override onHitWall to define behavior when robot hits a wall
 	 * @param e Resulting HitWallEvent instance
 	 */
 	public void onHitWall(HitWallEvent e) {
+		double wallAngle = (getHeading() + e.getBearing() + 360) % 360;
+		double getawayAngle = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getGunHeading(), wallAngle + 90));
 
-	}
+		setTurnRight(getawayAngle);
+		setBack(60);
 
-	/**
-	 * Override onBulletHit to define behavior when shot bullet hits another robot
-	 * @param e Resulting BulletHitEvent instance
-	 */
-	public void onBulletHit(BulletHitEvent e) {
+		motion = MotionType.HIT_WALL;
 	}
 
 	public void onHitRobot(HitRobotEvent e) {
-		// Check if hit an enemy
 		if (!isRegisteredTeammate(e.getName())) {
-			// TODO: React and fire
+			double enemyAngle = (getHeading() + e.getBearing() + 360) % 360;
+			double shootingAngle = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getGunHeading(), enemyAngle));
+			setTurnGunRight(ArenaCalculations.shortestAngle(shootingAngle));
+
+			motion = MotionType.ENEMY_COLLISION;
 		}
 	}
 
@@ -595,8 +596,6 @@ public class Captain extends TeamRobot {
 		// Keep radar spinning
 		setTurnRadarLeft(Rules.RADAR_TURN_RATE);
 
-		System.out.println(motion);
-
 		// Check if is avoiding bullet
 		if (motion != MotionType.AVOIDING_BULLET) {
 			if (motion != MotionType.AVOIDING_WALL && gps != null && gps.tooCloseToWalls(getCurrentLocation())) {
@@ -611,14 +610,23 @@ public class Captain extends TeamRobot {
 
 				if (Math.abs(angleDeltaHeadingToCenter) > Math.abs(angleDeltaButtHeadingToCenter)) {
 					setTurnRight(ArenaCalculations.shortestAngle(buttHeading+180));
-					setAhead(-100);
+					setAhead(-50);
 				}
 
 				else {
 					setTurnRight(angleDeltaHeadingToCenter);
-					setAhead(100);
+					setAhead(50);
 				}
 
+			}
+
+			if (motion == MotionType.ENEMY_COLLISION && getGunTurnRemaining() == 0) {
+				fireAndBroadcast(3);
+				motion = MotionType.READY_TO_MOVE;
+			}
+
+			if (motion == MotionType.HIT_WALL && getDistanceRemaining() == 0) {
+				motion = MotionType.READY_TO_MOVE;
 			}
 
 			if (motion == MotionType.AVOIDING_WALL && getTurnRemaining() == 0 && getVelocity() == 0) {
@@ -631,7 +639,7 @@ public class Captain extends TeamRobot {
 			}
 
 			// Keep moving to destination
-			if ((motion == MotionType.GOING_TO_DESTINATION) && (getCurrentLocation().distanceTo(destination) < 20)) {
+			if ((motion == MotionType.GOING_TO_DESTINATION || motion == MotionType.MAKING_TURN) && (getCurrentLocation().distanceTo(destination) < 50)) {
 				motion = MotionType.READY_TO_MOVE;
 			}
 
@@ -660,12 +668,12 @@ public class Captain extends TeamRobot {
 
 				if (e.getTime() - lastSpontaneousAction >= SPONTANEOUS_ACTION_COOLDOWN) {
 					if (ThreadLocalRandom.current().nextDouble() <= PROBABILITY_OF_SPONTANEOUS_TURN) {
-						double turnAngle = ThreadLocalRandom.current().nextDouble(-180, 180);
+						double turnAngle = ThreadLocalRandom.current().nextDouble(-90, 90);
 						setTurnRight(turnAngle);
 						motion = MotionType.SPONTANEOUS_TURN;
 
 					} else if (ThreadLocalRandom.current().nextDouble() <= PROBABILITY_OF_SPONTANEOUS_SPEED_LIMITATION) {
-						double speedLimit = ThreadLocalRandom.current().nextDouble(0, 7);
+						double speedLimit = ThreadLocalRandom.current().nextDouble(0, 5);
 						setMaxVelocity(speedLimit);
 						motion = MotionType.SPONTANEOUS_SPEED_LIMIT;
 
@@ -710,12 +718,12 @@ public class Captain extends TeamRobot {
 					orderBounties();
 				}
 
-				//TODO setBounty(mostWanted);
+				setBounty(mostWanted);
 			}
 
 			else {
 				// Inform leader that robot is ready to fire
-				//TODO sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
+				sendMessageToTeammate(currentLeader, new Message(MessageType.GUN_READY_INFO));
 			}
 		}
 
@@ -744,8 +752,8 @@ public class Captain extends TeamRobot {
 			}
 
 			if (target == null) {
-				System.out.println("NO CAN DO WITH SIMULATION!!");
-				// TODO: WHAT TO DO IF FAILED SIMULATION?
+				// Get new tracker
+				cleanGun();
 			}
 
 		}
@@ -778,7 +786,7 @@ public class Captain extends TeamRobot {
 		lastVelocity = e.getStatus().getVelocity();
 
 		// Check if collision with friendly bullet is imminent
-		teamBullets.removeIf(bi -> (bi.getBulletLocation(e.getTime()) == null) || (avoidedBullets.contains(bi)));
+		teamBullets.removeIf(bi -> (bi.bulletIsNull()) || (bi.getBulletLocation(e.getTime()) == null) || (avoidedBullets.contains(bi)));
 		avoidedBullets.removeIf(bi -> !teamBullets.contains(bi));
 
 		for (int i=1; i<=BULLET_ITERATIONS_PREVISION; i++) {

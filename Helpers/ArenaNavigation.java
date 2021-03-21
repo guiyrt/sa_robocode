@@ -89,7 +89,9 @@ public class ArenaNavigation {
     }
 
     public boolean legalLocation(Location destination, Location current, boolean ignoreSelf) {
-        boolean center = centerOfArena().distanceTo(destination) >= DISTANCE_FROM_CENTER;
+        Location centerLoc = centerOfArena();
+        boolean center = (destination.getX() <= (centerLoc.getX() - DISTANCE_FROM_CENTER) || destination.getX() >= (centerLoc.getX() + DISTANCE_FROM_CENTER))
+                && (destination.getY() <= (centerLoc.getY() - DISTANCE_FROM_CENTER) || destination.getY() >= (centerLoc.getY() + DISTANCE_FROM_CENTER));
 
         // Check clearance from walls
         boolean walls = getWalls(destination).stream()
@@ -159,9 +161,9 @@ public class ArenaNavigation {
         }
 
         if (!bingo) {
-            System.out.println("COULD NOT FIND!");
+            // Go halfway to middle of arena
+            selected = new Vector(current, centerOfArena()).scalar(0.5).apply(current);
         }
-        // TODO: may not find random option
 
         return selected;
     }

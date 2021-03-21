@@ -57,14 +57,6 @@ public class BulletInfo implements Serializable {
     }
 
     /**
-     * Retrieves bullet power
-     * @return Bullet power
-     */
-    public Double getBulletPower() {
-        return bullet.getPower();
-    }
-
-    /**
      * Calculates bullet velocity, which is power dependant
      * @return Bullet velocity
      */
@@ -76,6 +68,10 @@ public class BulletInfo implements Serializable {
         return ArenaCalculations.angleToUnitVector(getFiredAngle()).scalar(getBulletVelocity());
     }
 
+    public boolean bulletIsNull() {
+        return bullet == null;
+    }
+
     /**
      * Given a tick, calculates the position of the bullet in that tick
      * @param targetTick On which tick to determine the bullet position
@@ -83,7 +79,7 @@ public class BulletInfo implements Serializable {
      */
     public Location getBulletLocation(Long targetTick) {
         // Check if bullet has hit anyone
-        if (bullet.getVictim() != null) {
+        if (bullet != null && bullet.getVictim() != null) {
             return null;
         }
 
