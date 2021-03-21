@@ -73,4 +73,8 @@ public class Location implements Serializable {
     public boolean equals(Location location) {
         return x.equals(location.getX()) && y.equals(location.getY());
     }
+
+    public Location clone() {
+        return new Location(getX(), getY());
+    }
 }

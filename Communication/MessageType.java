@@ -13,5 +13,6 @@ public enum MessageType implements Serializable {
     BOUNTIES_INFO,
     TEAMMATE_REGISTER,
     FIRE_REQUEST,
-    MOVE_REQUEST
+    MOVE_REQUEST,
+    LOCATION_UPDATE
 }

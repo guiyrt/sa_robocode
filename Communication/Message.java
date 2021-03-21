@@ -1,6 +1,7 @@
 package sa_robocode.Communication;
 
 
+import sa_robocode.Helpers.Location;
 import sa_robocode.Helpers.Tracker;
 
 import java.io.Serializable;
@@ -17,7 +18,7 @@ public class Message implements Serializable {
     private final MoveRequest moveRequest;
     private final TeammateInfo teammateInfo;
     private final Set<Tracker> bounties;
-    private final String informationString;
+    private final Location location;
 
     /**
      * Creates instance of Message only with MessageType, no other content
@@ -31,7 +32,7 @@ public class Message implements Serializable {
         this.moveRequest = null;
         this.teammateInfo = null;
         this.bounties = null;
-        this.informationString = null;
+        this.location = null;
     }
 
     /**
@@ -46,7 +47,7 @@ public class Message implements Serializable {
         this.moveRequest = null;
         this.teammateInfo = null;
         this.bounties = null;
-        this.informationString = null;
+        this.location = null;
     }
 
     /**
@@ -61,7 +62,7 @@ public class Message implements Serializable {
         this.moveRequest = null;
         this.teammateInfo = null;
         this.bounties = null;
-        this.informationString = null;
+        this.location = null;
     }
 
     /**
@@ -76,7 +77,7 @@ public class Message implements Serializable {
         this.moveRequest = null;
         this.teammateInfo = null;
         this.bounties = null;
-        this.informationString = null;
+        this.location = null;
     }
 
     /**
@@ -91,7 +92,7 @@ public class Message implements Serializable {
         this.fireRequest = null;
         this.teammateInfo = null;
         this.bounties = null;
-        this.informationString = null;
+        this.location = null;
     }
 
     /**
@@ -106,7 +107,7 @@ public class Message implements Serializable {
         this.scanInfo = null;
         this.fireRequest = null;
         this.bounties = null;
-        this.informationString = null;
+        this.location = null;
     }
 
     public Message(Set<Tracker> bounties) {
@@ -117,17 +118,13 @@ public class Message implements Serializable {
         this.bulletInfo = null;
         this.scanInfo = null;
         this.fireRequest = null;
-        this.informationString = null;
+        this.location = null;
     }
 
-    /**
-     * Creates instance of Message with a information String
-     * @param informationString String instance
-     * @param messageType Message type
-     */
-    public Message(String informationString, MessageType messageType) {
-        this.messageType = messageType;
-        this.informationString = informationString;
+
+    public Message(Location location) {
+        this.messageType = MessageType.LOCATION_UPDATE;
+        this.location = location;
         this.bounties = null;
         this.moveRequest = null;
         this.bulletInfo = null;
@@ -194,8 +191,8 @@ public class Message implements Serializable {
      * Could be null, if messageType is not meant for this information transmission
      * @return String from message
      */
-    public String getInformationString() {
-        return informationString;
+    public Location getLocation() {
+        return location;
     }
 
     public Set<Tracker> getBounties() {
