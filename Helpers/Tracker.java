@@ -33,7 +33,12 @@ public class Tracker implements Serializable {
     public void addPing(ScanInfo si) {
         // Adds to pings if list is empty, or it the last ping isn't from the same tick
         if (pings.size() == 0 || pings.get(0).getScannedRobotEvent().getTime() != si.getScannedRobotEvent().getTime()) {
-            pings.add(0, si);
+            if(pings.size()>=50) {
+                pings.remove(pings.size()-1);
+                pings.add(0, si);
+            }else{
+                pings.add(0, si);
+            }
         }
     }
 

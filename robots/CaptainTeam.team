@@ -4,4 +4,4 @@ team.description=Testing
 robocode.version=1.9.3.9
 team.author.name=
 team.version=0.0
-team.members=sa_robocode.robots.Captain*,sa_robocode.robots.Captain*
+team.members=sa_robocode.robots.Captain*,sa_robocode.robots.Captain*,sa_robocode.robots.Captain*,sa_robocode.robots.Captain*,sa_robocode.robots.Captain*
