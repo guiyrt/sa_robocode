@@ -7,8 +7,8 @@ import java.util.*;
 public class ArenaNavigation {
     private static final double DISTANCE_FROM_TEAMMATES = 100.0;
     private static final double DISTANCE_FROM_ENEMIES = 60.0;
-    private static final double DISTANCE_FROM_ORIGINAL_LOCATION = 400.0;
-    private static final double DISTANCE_FROM_WALLS = ArenaCalculations.ROBOT_CENTER_TO_EDGE;
+    private static final double DISTANCE_FROM_ORIGINAL_LOCATION = 250.0;
+    private static final double DISTANCE_FROM_WALLS = 100.0;
     private static final double MAX_ATTEMPTS = 200;
 
     private final Map<String, Tracker> enemiesTracking;
