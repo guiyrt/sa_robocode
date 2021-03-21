@@ -48,13 +48,13 @@ public class Droid extends TeamRobot implements robocode.Droid {
     private MotionType motion = MotionType.READY_TO_MOVE;
     private Location destination = null;
     private String currentLeader = null;
-    private boolean outOfDateBounties = true;
     private Tracker bounty = null;
     private Location target = null;
     private boolean readyToFire = false;
     private double lastHeading = 0;
     private double lastVelocity = 0;
     private long lastSpontaneousAction = 0;
+    private int makeTurnMax = 0;
 
     /**
      * Definition of useful static values to access in methods
@@ -85,8 +85,6 @@ public class Droid extends TeamRobot implements robocode.Droid {
         lastHeading = getHeading();
         lastVelocity = getVelocity();
         currentLeader = null;
-
-        goToLocation(new Location(0.0, 300.0));
     }
 
     /**
@@ -94,44 +92,6 @@ public class Droid extends TeamRobot implements robocode.Droid {
      * @param g2d Graphics2D instance from robocode instance
      */
     public void onPaint(Graphics2D g2d) {
-        if (destination != null) {
-            for (int i=0; i<360; i+=2) {
-                Painter.drawLocation(g2d, Color.green, ArenaCalculations.polarInfoToLocation(destination, (double) i, 50.0));
-            }
-        }
-
-/*		for (int i=0; i<360; i+=2) {
-			Painter.drawLocation(g2d, Color.yellow, ArenaCalculations.polarInfoToLocation(new Location(getBattleFieldWidth()/2, getBattleFieldHeight()/2), (double) i, 150.0));
-		}
-
-		for (Location l: teammatesTracking.values()) {
-			for (int i=0; i<360; i+=2) {
-				Painter.drawLocation(g2d, Color.MAGENTA, ArenaCalculations.polarInfoToLocation(l, (double) i, 50.0));
-			}
-		}
-
-		for (Tracker l: enemiesTracking.values()) {
-			for (int i=0; i<360; i+=2) {
-				Painter.drawLocation(g2d, Color.yellow, ArenaCalculations.polarInfoToLocation(l.getLastKnownLocation(), (double) i, 50.0));
-			}
-		}
-
-		for (int i=0; i<360; i+=2) {
-			Painter.drawLocation(g2d, Color.yellow, ArenaCalculations.polarInfoToLocation(getCurrentLocation(), (double) i, 100.0));
-		}*/
-
-/*		if (gps != null) {
-			double maxX = gps.getXMaxAllowedZone(getCurrentLocation());
-			double maxY = gps.getYMaxAllowedZone(getCurrentLocation());
-			double minX = gps.getXMinAllowedZone(getCurrentLocation());
-			double minY = gps.getYMinAllowedZone(getCurrentLocation());
-
-			Painter.drawLine(g2d, Color.orange, new Location(minX, minY), new Location(maxX, minY));
-			Painter.drawLine(g2d, Color.orange, new Location(maxX, minY), new Location(maxX, maxY));
-			Painter.drawLine(g2d, Color.orange, new Location(maxX, maxY), new Location(minX, maxY));
-			Painter.drawLine(g2d, Color.orange, new Location(minX, maxY), new Location(minX, minY));
-
-		}*/
     }
 
     /**
@@ -268,11 +228,6 @@ public class Droid extends TeamRobot implements robocode.Droid {
 
         currentLeader = leader;
 
-        System.out.println(getTime() + " NEW LEADER IS " + leader);
-    }
-
-    public boolean amCurrentLeader() {
-        return getName().equals(currentLeader);
     }
 
     public boolean teammatesBetweenLocation(Location location) {
@@ -398,23 +353,6 @@ public class Droid extends TeamRobot implements robocode.Droid {
             }
         }
     }
-
-    public Location getRobotLocationFromScanEvent(ScannedRobotEvent sre) {
-        return ArenaCalculations.polarInfoToLocation(getCurrentLocation(), ArenaCalculations.convertAngleToPolarOrArena(getHeading() + sre.getBearing()), sre.getDistance());
-    }
-
-    /**
-     * Override onScannedRobot to handle robot detection
-     * @param sre Resulting ScannedRobotEvent instance
-     */
-    public void onScannedRobot(ScannedRobotEvent sre) {
-        Location detectedRobotLocation = getRobotLocationFromScanEvent(sre);
-        ScanInfo si = new ScanInfo(detectedRobotLocation, sre);
-
-        sendMessageToTeam(new Message(si));
-        processScanInfo(si);
-    }
-
 
     /**
      * Override onHitWall to define behavior when robot hits a wall
@@ -548,6 +486,7 @@ public class Droid extends TeamRobot implements robocode.Droid {
             if (motion == MotionType.ENEMY_COLLISION && getGunTurnRemaining() == 0) {
                 fireAndBroadcast(3);
                 motion = MotionType.READY_TO_MOVE;
+                back(50);
             }
 
             if (motion == MotionType.HIT_WALL && getDistanceRemaining() == 0) {
@@ -612,28 +551,42 @@ public class Droid extends TeamRobot implements robocode.Droid {
             }
 
             if (motion == MotionType.MAKING_TURN) {
-                double nextVelocity = acceleration > 0 ? Math.min(e.getStatus().getVelocity() + acceleration, Rules.MAX_VELOCITY) : Math.max(e.getStatus().getVelocity() + acceleration, 0);
-                double maxTurn = Rules.MAX_TURN_RATE - (0.75 * nextVelocity);
-
-                double currentAngleToDestination = ArenaCalculations.angleFromOriginToLocation(getCurrentLocation(), destination);
-                double angleDelta = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getHeading(), currentAngleToDestination));
-
-                if (Math.abs(angleDelta) >  maxTurn) {
-                    setMaxVelocity(6.5);
-                    angleDelta = angleDelta > 0 ? maxTurn : -maxTurn;
+                makeTurnMax++;
+                if (gps.tooCloseToRobots(getCurrentLocation()) || makeTurnMax > 20) {
+                    back(15);
+                    motion = MotionType.READY_TO_MOVE;
+                    makeTurnMax = 0;
                 }
 
                 else {
-                    motion = MotionType.GOING_TO_DESTINATION;
-                }
+                    double nextVelocity = acceleration > 0 ? Math.min(e.getStatus().getVelocity() + acceleration, Rules.MAX_VELOCITY) : Math.max(e.getStatus().getVelocity() + acceleration, 0);
+                    double maxTurn = Rules.MAX_TURN_RATE - (0.75 * nextVelocity);
 
-                setTurnRight(angleDelta);
-                setAhead(50);
+                    double currentAngleToDestination = ArenaCalculations.angleFromOriginToLocation(getCurrentLocation(), destination);
+                    double angleDelta = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getHeading(), currentAngleToDestination));
+
+                    if (Math.abs(angleDelta) > maxTurn) {
+                        setMaxVelocity(6.5);
+                        angleDelta = angleDelta > 0 ? maxTurn : -maxTurn;
+                    } else {
+                        motion = MotionType.GOING_TO_DESTINATION;
+                    }
+
+                    setTurnRight(angleDelta);
+                    setAhead(50);
+                }
+            }
+
+            else {
+                makeTurnMax = 0;
             }
         }
 
-        else if ((getTurnRemaining() == 0) && (getDistanceRemaining() == 0)) {
-            motion = MotionType.READY_TO_MOVE;
+        else {
+            System.out.println(Math.abs(getTurnRemaining()) + " " + Math.abs(getDistanceRemaining()));
+            if ((Math.abs(getTurnRemaining()) < 1 ) && (Math.abs(getDistanceRemaining()) < 1)) {
+                motion = MotionType.READY_TO_MOVE;
+            }
         }
 
         // Ready to acquire target
@@ -712,6 +665,7 @@ public class Droid extends TeamRobot implements robocode.Droid {
                 if (nextBulletLocation != null && ArenaCalculations.isLocationInsideRobot(nextRobotLocation, e.getStatus().getHeading(), nextBulletLocation, ROBOT_EDGES_DISTANCE_TOLERANCE)) {
                     // Robot is in a collision course, calculate in which direction to go
                     motion = MotionType.AVOIDING_BULLET;
+                    setMaxVelocity(Rules.MAX_VELOCITY);
 
                     Vector bulletVector = bi.getBulletVector();
                     Vector robotVector = ArenaCalculations.angleToUnitVector(e.getStatus().getHeading());
@@ -736,7 +690,6 @@ public class Droid extends TeamRobot implements robocode.Droid {
 
                     setAhead(distanceToAvoidBullet);
                     setTurnRight(angleToAvoidBullet);
-                    execute();
 
                     // Once found one possible collision, ignore future iterations
                     avoidedBullets.add(bi);

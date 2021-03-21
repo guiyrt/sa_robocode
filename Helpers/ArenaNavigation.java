@@ -2,6 +2,7 @@ package sa_robocode.Helpers;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 public class ArenaNavigation {
     private static final double DISTANCE_FROM_TEAMMATES = 50.0;
@@ -9,6 +10,7 @@ public class ArenaNavigation {
     private static final double DISTANCE_FROM_ORIGINAL_LOCATION = 100.0;
     private static final double DISTANCE_FROM_WALLS = 100.0;
     private static final double DISTANCE_FROM_CENTER = 150.0;
+    private static final double DANGER_ZONE = 35.0;
     private static final int MAX_ATTEMPTS = 200;
     private static final double VERIFICATION_STEP = 2.0;
 
@@ -111,6 +113,20 @@ public class ArenaNavigation {
         boolean obstaclesClearance = walls && enemies && team && center;
 
         return ignoreSelf ? obstaclesClearance : obstaclesClearance && (current.distanceTo(destination) >= DISTANCE_FROM_ORIGINAL_LOCATION);
+    }
+
+    public boolean tooCloseToRobots(Location current) {
+        // Check clearance from enemies
+        boolean enemies = enemiesTracking.values().stream()
+                .map(tracker -> tracker.getLastKnownLocation().distanceTo(current) < DANGER_ZONE)
+                .reduce(false, (a, b) -> a || b);
+
+        // Check clearance from teammates
+        boolean team = teammatesTracking.values().stream()
+                .map(l -> l.distanceTo(current) < DANGER_ZONE)
+                .reduce(false, (a, b) -> a || b);
+
+        return enemies || team;
     }
 
     public boolean tooCloseToWalls(Location current) {

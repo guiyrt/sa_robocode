@@ -11,5 +11,4 @@ public enum MotionType {
     AVOIDING_WALL,
     ENEMY_COLLISION,
     HIT_WALL
-
 }
