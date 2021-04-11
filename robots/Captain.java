@@ -25,9 +25,9 @@ public class Captain extends TeamRobot {
 	/**
 	 * Definition of colors to paint robots
 	 */
-	private static final Color ARMY_GREEN = Color.decode("#FFFFFF");
-	private static final Color ARMY_DARK_GREEN = Color.decode("#FFFFFF");
-	private static final Color RADAR_RED = Color.decode("#CC0000");
+	private static final Color WHITE = Color.decode("#FFFFFF");
+	private static final Color YOLK_YELLOW = Color.decode("#FFFF52");
+	private static final Color RADAR_ORANGE = Color.decode("#FFA414");
 	private static final Color COPPER_BULLET = Color.decode("#B87333");
 	private static final Color BEAM_BLUE = Color.decode("#ADD8E6");
 
@@ -77,7 +77,7 @@ public class Captain extends TeamRobot {
 	public void run() {
 		setMaxVelocity(MAX_ALLOWED_VELOCITY);
 		gps = new ArenaNavigation(teammatesTracking, teamStatus, getBattleFieldWidth(), getBattleFieldHeight(), getName());
-		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
+		setColors(WHITE, YOLK_YELLOW, RADAR_ORANGE, COPPER_BULLET, BEAM_BLUE); // Set tank colors
 		updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy()), MessageType.TEAMMATE_REGISTER); // Register in team
 		lastHeading = getHeading();
 		lastVelocity = getVelocity();
