@@ -12,7 +12,5 @@ public enum MessageType implements Serializable {
     GUN_READY_INFO,
     BOUNTIES_INFO,
     TEAMMATE_REGISTER,
-    FIRE_REQUEST,
-    MOVE_REQUEST,
     LOCATION_UPDATE
 }

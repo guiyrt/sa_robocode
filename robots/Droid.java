@@ -1,3 +1,4 @@
+/*
 package sa_robocode.robots;
 
 import sa_robocode.Communication.*;
@@ -16,27 +17,35 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
+*/
 /**
  * Captain - a robot by Group 9
- */
+ *//*
+
 public class Droid extends TeamRobot implements robocode.Droid {
-    /**
+    */
+/**
      * Robot defining static attributes
-     */
+     *//*
+
     private static final RobotType robotType = RobotType.DROID;
 
-    /**
+    */
+/**
      * Definition of colors to paint robots
-     */
+     *//*
+
     private static final Color ARMY_GREEN = Color.decode("#3A4119");
     private static final Color ARMY_DARK_GREEN = Color.decode("#2A2E12");
     private static final Color RADAR_RED = Color.decode("#CC0000");
     private static final Color COPPER_BULLET = Color.decode("#B87333");
     private static final Color BEAM_BLUE = Color.decode("#ADD8E6");
 
-    /**
+    */
+/**
      * Definition of data structures to aid determination of robot behavior
-     */
+     *//*
+
     private final Map<String, Tracker> enemiesTracking = new HashMap<>();
     private final Map<String, Boolean> enemyDroids = new HashMap<>();
     private final Map<String, Location> teammatesTracking = new HashMap<>();
@@ -56,9 +65,11 @@ public class Droid extends TeamRobot implements robocode.Droid {
     private long lastSpontaneousAction = 0;
     private int makeTurnMax = 0;
 
-    /**
+    */
+/**
      * Definition of useful static values to access in methods
-     */
+     *//*
+
     private static final int BULLET_ITERATIONS_PREVISION = 9;
     private static final double AVOID_BULLET_DISTANCE = 70.0;
     private static final double TEAMMATE_MIN_DISTANCE_TO_FIRE = 215.0;
@@ -75,9 +86,11 @@ public class Droid extends TeamRobot implements robocode.Droid {
     private static final long SPONTANEOUS_ACTION_COOLDOWN = 5;
 
 
-    /**
+    */
+/**
      * Main method with robot behavior.
-     */
+     *//*
+
     public void run() {
         gps = new ArenaNavigation(enemiesTracking, teammatesTracking, getBattleFieldWidth(), getBattleFieldHeight());
         setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
@@ -87,34 +100,42 @@ public class Droid extends TeamRobot implements robocode.Droid {
         currentLeader = null;
     }
 
-    /**
+    */
+/**
      * Override onPaint method to paint in the battlefield
      * @param g2d Graphics2D instance from robocode instance
-     */
+     *//*
+
     public void onPaint(Graphics2D g2d) {
     }
 
-    /**
+    */
+/**
      * Creates new Location instance with current robot location
      * @return Current robot coordinates wrapped in Location
-     */
+     *//*
+
     public Location getCurrentLocation() {
         return new Location(getX(), getY());
     }
 
-    /**
+    */
+/**
      * Moves robot to desired location
      * @param location Destination
-     */
+     *//*
+
     public void goToLocation(Location location) {
         faceTowards(location);
         ahead(location.distanceTo(getCurrentLocation()));
     }
 
-    /**
+    */
+/**
      * Turns robot to desired destination
      * @param location Destination
-     */
+     *//*
+
     public void faceTowards(Location location) {
         double angleOffset = ArenaCalculations.angleRightOffsetToLocation(getHeading(), getCurrentLocation(), location);
         turnRight(angleOffset);
@@ -129,39 +150,47 @@ public class Droid extends TeamRobot implements robocode.Droid {
         return teamStatus.values().stream().map(TeammateInfo::getName).anyMatch(teammate -> teammate.equals(name));
     }
 
-    /**
+    */
+/**
      * Requests teammate to move to location
      * @param location Desired location
-     */
+     *//*
+
     public void requestMoveToLocation(Location location, String teammate) {
         MoveRequest mr = new MoveRequest(location);
         sendMessageToTeammate(teammate, new Message(mr));
     }
 
-    /**
+    */
+/**
      * Requests teammate to fire at one location
      * @param power Desired power
      * @param location Desired location
-     */
+     *//*
+
     public void requestFireToLocation(String teammate, Double power, Location location) {
         FireRequest fr = new FireRequest(power, location);
         sendMessageToTeammate(teammate, new Message(fr));
     }
 
-    /**
+    */
+/**
      * Requests team to fire at one location
      * @param power Desired power
      * @param location Desired location
-     */
+     *//*
+
     public void requestFireToLocation(Double power, Location location) {
         FireRequest fr = new FireRequest(power, location);
         sendMessageToTeam(new Message(fr));
     }
 
-    /**
+    */
+/**
      * Fires a bullet and broadcasts information regarding bullet trajectory
      * @param power Power of bullet
-     */
+     *//*
+
     public void fireAndBroadcast(double power) {
         if (getGunHeat() == 0.0) {
             Long fireTick = getTime();
@@ -170,10 +199,12 @@ public class Droid extends TeamRobot implements robocode.Droid {
         }
     }
 
-    /**
+    */
+/**
      * Processes the scanned robot information, depending if is teammate or not
      * @param si ScanInfo regarding the scanned robot
-     */
+     *//*
+
     public void processScanInfo(ScanInfo si) {
         String name = si.getScannedRobotEvent().getName();
 
@@ -271,10 +302,12 @@ public class Droid extends TeamRobot implements robocode.Droid {
         }
     }
 
-    /**
+    */
+/**
      * Broadcasts message to entire team
      * @param msg Instance of Message to send to all teammates
-     */
+     *//*
+
     public void sendMessageToTeam(Message msg) {
         try {
             broadcastMessage(msg);
@@ -284,11 +317,13 @@ public class Droid extends TeamRobot implements robocode.Droid {
         }
     }
 
-    /**
+    */
+/**
      * Sends message to specific teammate
      * @param teammate Teammate name
      * @param msg Instance of Message to send
-     */
+     *//*
+
     public void sendMessageToTeammate(String teammate, Message msg) {
         try {
             sendMessage(teammate, msg);
@@ -298,10 +333,12 @@ public class Droid extends TeamRobot implements robocode.Droid {
         }
     }
 
-    /**
+    */
+/**
      * Override onMessageReceived to handle received messages
      * @param me MessageEvent instance
-     */
+     *//*
+
     public void onMessageReceived(MessageEvent me) {
         Message message = (Message) me.getMessage();
 
@@ -354,10 +391,12 @@ public class Droid extends TeamRobot implements robocode.Droid {
         }
     }
 
-    /**
+    */
+/**
      * Override onHitWall to define behavior when robot hits a wall
      * @param e Resulting HitWallEvent instance
-     */
+     *//*
+
     public void onHitWall(HitWallEvent e) {
         double wallAngle = (getHeading() + e.getBearing() + 360) % 360;
         double getawayAngle = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getGunHeading(), wallAngle + 90));
@@ -701,4 +740,4 @@ public class Droid extends TeamRobot implements robocode.Droid {
             }
         }
     }
-}
+}*/

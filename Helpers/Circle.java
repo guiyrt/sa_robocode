@@ -3,7 +3,6 @@ package sa_robocode.Helpers;
 import sa_robocode.Communication.ScanInfo;
 
 import java.io.Serializable;
-import java.util.List;
 
 public class Circle implements Serializable {
     private static final double TOLERANCE = Math.pow(10, -1);

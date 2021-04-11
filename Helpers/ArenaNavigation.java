@@ -1,186 +1,133 @@
 package sa_robocode.Helpers;
 
+import java.awt.geom.Path2D;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 
 public class ArenaNavigation {
-    private static final double DISTANCE_FROM_TEAMMATES = 50.0;
-    private static final double DISTANCE_FROM_ENEMIES = 50.0;
-    private static final double DISTANCE_FROM_ORIGINAL_LOCATION = 100.0;
-    private static final double DISTANCE_FROM_WALLS = 100.0;
-    private static final double DISTANCE_FROM_CENTER = 150.0;
-    private static final double DANGER_ZONE = 35.0;
-    private static final int MAX_ATTEMPTS = 200;
-    private static final double VERIFICATION_STEP = 2.0;
+    private static final Double MIN_DISTANCE_TO_WALLS = 95.0;
 
     private final Map<String, Tracker> enemiesTracking;
     private final Map<String, Location> teammatesTracking;
     private final double arenaWidth;
     private final double arenaHeight;
+    private final Zone zone;
 
-    public ArenaNavigation(Map<String, Tracker> enemiesTracking, Map<String, Location> teammatesTracking, double arenaWidth, double arenaHeight) {
+    private enum Zone {
+        QUADRANT_0, // BOTTOM LEFT
+        QUADRANT_1, // BOTTOM RIGHT
+        QUADRANT_2, // TOP RIGHT
+        QUADRANT_3, // TOP LEFT
+        FULL_ARENA
+    }
+
+    public ArenaNavigation(Map<String, Tracker> enemiesTracking, Map<String, Location> teammatesTracking, double arenaWidth, double arenaHeight, int number) {
         this.enemiesTracking = enemiesTracking;
         this.teammatesTracking = teammatesTracking;
         this.arenaWidth = arenaWidth;
         this.arenaHeight = arenaHeight;
+        this.zone = Zone.values()[number % 5];
     }
 
-    public List<Location> getWalls(Location location) {
+    public Location adjustLocToZone(Location original) {
+        Location adjusted = original.clone();
+
+        switch (this.zone) {
+            case QUADRANT_1 -> adjusted = new Location(original.getX() - arenaWidth/2, original.getY());
+            case QUADRANT_2 -> adjusted = new Location(original.getX() - arenaWidth/2, original.getY() - arenaHeight/2);
+            case QUADRANT_3 -> adjusted = new Location(original.getX(), original.getY() - arenaHeight/2);
+        }
+
+        return adjusted;
+    }
+
+    public List<Location> getWalls(Location location, boolean zoneAdjusted) {
+        Location adjustedLocation = zoneAdjusted ? adjustLocToZone(location) : location;
+        int adjustWalls = zoneAdjusted && (zone != Zone.FULL_ARENA) ? 2 : 1;
+
         List<Location> walls = new ArrayList<>();
-        walls.add(new Location(location.getX(), arenaHeight));
-        walls.add(new Location(location.getX(), 0.0));
-        walls.add(new Location(0.0, location.getY()));
-        walls.add(new Location(arenaWidth, location.getY()));
+        walls.add(new Location(adjustedLocation.getX(), arenaHeight/adjustWalls));
+        walls.add(new Location(adjustedLocation.getX(), 0.0));
+        walls.add(new Location(0.0, adjustedLocation.getY()));
+        walls.add(new Location(arenaWidth/adjustWalls, adjustedLocation.getY()));
 
         return walls;
     }
 
-    public Location centerOfArena() {
-        return new Location(arenaWidth/2.0, arenaHeight/2.0);
-    }
+    public Location getCenterOfZone() {
+        Location zoneCenter = new Location(arenaWidth/2, arenaHeight/2);
 
-    public double getXMaxAllowedZone(Location location) {
-        if (location.getY() > (arenaHeight/2.0)) {
-            return Math.max(location.getX(), arenaWidth / 2.0);
+        switch (zone) {
+            case QUADRANT_0 -> zoneCenter = new Location(arenaWidth/4, arenaHeight/4);
+            case QUADRANT_1 -> zoneCenter = new Location(3*arenaWidth/4, arenaHeight/4);
+            case QUADRANT_2 -> zoneCenter = new Location(3*arenaWidth/4, 3*arenaHeight/4);
+            case QUADRANT_3 -> zoneCenter = new Location(arenaWidth/4, 3*arenaHeight/4);
         }
 
-        else {
-            return arenaWidth;
-        }
+        return zoneCenter;
     }
 
-    public double getXMinAllowedZone(Location location) {
-        if (location.getX() > (arenaHeight/2.0)) {
-            if (location.getY() > (arenaHeight/2.0)) {
-                return 0;
+    public boolean isInsideOfZone(Location location) {
+        if (zone == Zone.FULL_ARENA) return true;
+
+        Location adjustedLocation = adjustLocToZone(location);
+
+        return (adjustedLocation.getX() > 0) && (adjustedLocation.getX() < arenaWidth/2)
+                && (adjustedLocation.getY() > 0) && (adjustedLocation.getY() < arenaHeight/2);
+    }
+
+
+    public Double getTargetHeading(Location robot) {
+        if (!isInsideOfZone(robot)) {
+            return null;
+        }
+
+        Location adjustedRobot = adjustLocToZone(robot);
+        List<Location> walls = getWalls(robot, true);
+        walls.sort(Comparator.comparingDouble(o -> o.distanceTo(adjustedRobot)));
+
+        if (walls.get(0).distanceTo(adjustedRobot) < MIN_DISTANCE_TO_WALLS) {
+            if (walls.get(1).distanceTo(adjustedRobot) < MIN_DISTANCE_TO_WALLS * 1.4) {
+                Vector generalDirection = new Vector(walls.get(0), adjustedRobot).add(new Vector(walls.get(1), adjustedRobot));
+                return ThreadLocalRandom.current().nextDouble(-45, 45) + generalDirection.arenaAngleOfVector();
             }
+
             else {
-                return arenaWidth / 2.0;
+                Vector generalDirection = new Vector(walls.get(0), adjustedRobot);
+                return ThreadLocalRandom.current().nextDouble(-90, 90) + generalDirection.arenaAngleOfVector();
+
             }
         }
 
-        else {
-            if (location.getY() > (arenaHeight/2.0)) {
-                return 0;
+        return null;
+    }
+
+    public boolean isHeadingTowardsZone(Location robot, double heading) {
+        Location centerOfZone = getCenterOfZone();
+        double offsetToWallX = arenaWidth/4;
+        double offsetToWallY = arenaHeight/4;
+        Path2D zoneLimits = new Path2D.Double();
+
+        Location topRightCorner = new Location(centerOfZone.getX() + offsetToWallX, centerOfZone.getY() + offsetToWallY);
+        Location topLeftCorner = new Location(centerOfZone.getX() - offsetToWallX, centerOfZone.getY() + offsetToWallY);
+        Location bottomRightCorner = new Location(centerOfZone.getX() + offsetToWallX, centerOfZone.getY() - offsetToWallY);
+        Location bottomLeftCorner = new Location(centerOfZone.getX() - offsetToWallX, centerOfZone.getY() - offsetToWallY);
+
+        zoneLimits.moveTo(topRightCorner.getX(), topRightCorner.getY());
+        zoneLimits.lineTo(topLeftCorner.getX(), topLeftCorner.getY());
+        zoneLimits.lineTo(bottomLeftCorner.getX(), bottomLeftCorner.getY());
+        zoneLimits.lineTo(bottomRightCorner.getX(), bottomRightCorner.getY());
+        zoneLimits.closePath();
+
+        Vector robotVector = ArenaCalculations.angleToUnitVector(heading).setLength(5);
+
+        while(ArenaCalculations.isInsideArena(robot, arenaWidth, arenaHeight)) {
+            if (zoneLimits.contains(robot.getX(), robot.getY())) {
+                return true;
             }
-            else {
-                return location.getX();
-            }
-        }
-    }
-
-    public double getYMaxAllowedZone(Location location) {
-        if (location.getX() > (arenaHeight/2.0)) {
-            return arenaHeight;
+            robot = robotVector.apply(robot);
         }
 
-        else {
-            return Math.max(location.getY(), (arenaHeight / 2.0));
-        }
-    }
-
-    public double getYMinAllowedZone(Location location) {
-        if (location.getX() > (arenaHeight/2.0)) {
-            return Math.min(location.getY(), (arenaHeight / 2.0));
-        }
-
-        else {
-            return 0;
-        }
-    }
-
-    public boolean legalLocation(Location destination, Location current, boolean ignoreSelf) {
-        Location centerLoc = centerOfArena();
-        boolean center = (destination.getX() <= (centerLoc.getX() - DISTANCE_FROM_CENTER) || destination.getX() >= (centerLoc.getX() + DISTANCE_FROM_CENTER))
-                && (destination.getY() <= (centerLoc.getY() - DISTANCE_FROM_CENTER) || destination.getY() >= (centerLoc.getY() + DISTANCE_FROM_CENTER));
-
-        // Check clearance from walls
-        boolean walls = getWalls(destination).stream()
-                .map(l -> l.distanceTo(destination) >= DISTANCE_FROM_WALLS)
-                .reduce(true, (a, b) -> a && b);
-
-        // Check clearance from enemies
-        boolean enemies = enemiesTracking.values().stream()
-                .map(tracker -> tracker.getLastKnownLocation().distanceTo(destination) >= DISTANCE_FROM_ENEMIES)
-                .reduce(true, (a, b) -> a && b);
-
-        // Check clearance from teammates
-        boolean team = teammatesTracking.values().stream()
-                .map(l -> l.distanceTo(destination) >= DISTANCE_FROM_TEAMMATES)
-                .reduce(true, (a, b) -> a && b);
-
-        boolean obstaclesClearance = walls && enemies && team && center;
-
-        return ignoreSelf ? obstaclesClearance : obstaclesClearance && (current.distanceTo(destination) >= DISTANCE_FROM_ORIGINAL_LOCATION);
-    }
-
-    public boolean tooCloseToRobots(Location current) {
-        // Check clearance from enemies
-        boolean enemies = enemiesTracking.values().stream()
-                .map(tracker -> tracker.getLastKnownLocation().distanceTo(current) < DANGER_ZONE)
-                .reduce(false, (a, b) -> a || b);
-
-        // Check clearance from teammates
-        boolean team = teammatesTracking.values().stream()
-                .map(l -> l.distanceTo(current) < DANGER_ZONE)
-                .reduce(false, (a, b) -> a || b);
-
-        return enemies || team;
-    }
-
-    public boolean tooCloseToWalls(Location current) {
-        return getWalls(current).stream().map(wall -> wall.distanceTo(current) <= DISTANCE_FROM_WALLS/2.0).reduce(false, (a,b) -> a || b);
-    }
-
-
-    public Location generateRandomLocation(Location location) {
-        return new Location(ThreadLocalRandom.current().nextDouble(getXMinAllowedZone(location), getXMaxAllowedZone(location)),
-                ThreadLocalRandom.current().nextDouble(getYMinAllowedZone(location), getYMaxAllowedZone(location)));
-    }
-
-    public int verifyPath(Location current, Location target) {
-        Vector drive = new Vector(current, target);
-        double distance = drive.length();
-        int infractions = 0;
-
-        drive.setLength(VERIFICATION_STEP);
-        Location simulated = drive.apply(current);
-
-        while (new Vector(current, simulated).length() < distance) {
-            if (!legalLocation(simulated, current, true)) {
-                infractions++;
-            }
-        }
-
-        return  infractions;
-    }
-
-    public Location getNextDestination(Location current) {
-        Location selected = generateRandomLocation(current);
-        boolean bingo = false;
-        int leastInfractions = Integer.MAX_VALUE;
-
-        for (int i=0; i<MAX_ATTEMPTS; i++) {
-            Location random = generateRandomLocation(current);
-            boolean legal = legalLocation(random, current, false);
-
-            if (legal) {
-                bingo = true;
-                int infractions = verifyPath(current, random);
-
-                if (leastInfractions == Integer.MAX_VALUE || infractions < leastInfractions) {
-                    selected = random.clone();
-                    leastInfractions = infractions;
-                }
-            }
-        }
-
-        if (!bingo) {
-            // Go halfway to middle of arena
-            selected = new Vector(current, centerOfArena()).scalar(0.5).apply(current);
-        }
-
-        return selected;
+        return false;
     }
 }

@@ -2,10 +2,6 @@ package sa_robocode.robots;
 
 import sa_robocode.Communication.*;
 import sa_robocode.Helpers.*;
-import sa_robocode.Helpers.PatternFinder;
-import sa_robocode.Helpers.Circle;
-import sa_robocode.Helpers.Projection;
-import sa_robocode.Helpers.Line;
 import robocode.*;
 import sa_robocode.Helpers.Vector;
 
@@ -24,6 +20,7 @@ public class Captain extends TeamRobot {
 	 * Robot defining static attributes
 	 */
 	private static final RobotType robotType = RobotType.CAPTAIN;
+	private static final List<MotionType> PRIORITY_MOTIONS = Arrays.asList(MotionType.AVOIDING_BULLET, MotionType.HIT_WALL, MotionType.ENEMY_COLLISION);
 
 	/**
 	 * Definition of colors to paint robots
@@ -46,7 +43,6 @@ public class Captain extends TeamRobot {
 	private final Set<Tracker> mostWanted = new LinkedHashSet<>();
 	private ArenaNavigation gps = null;
 	private MotionType motion = MotionType.READY_TO_MOVE;
-	private Location destination = null;
 	private String currentLeader = null;
 	private boolean outOfDateBounties = true;
 	private Tracker bounty = null;
@@ -54,8 +50,8 @@ public class Captain extends TeamRobot {
 	private boolean readyToFire = false;
 	private double lastHeading = 0;
 	private double lastVelocity = 0;
-	private long lastSpontaneousAction = 0;
-	private int makeTurnMax = 0;
+	private double targetHeading = 0;
+	private long ticksInStraightLine = 0;
 
 	/**
 	 * Definition of useful static values to access in methods
@@ -70,17 +66,18 @@ public class Captain extends TeamRobot {
 	private static final int MAX_SIMULATION_ITERATIONS_ENEMY = 100;
 	private static final double ROBOT_EDGES_DISTANCE_TOLERANCE = 6.0;
 	private static final double CRITICAL_ENERGY_LEVEL = 50.0;
-	private static final double PROBABILITY_OF_SPONTANEOUS_TURN = 0.10;
-	private static final double PROBABILITY_OF_SPONTANEOUS_SPEED_LIMITATION = 0.2;
-	private static final double PROBABILITY_OF_SPONTANEOUS_REVERSING = 0.05;
-	private static final long SPONTANEOUS_ACTION_COOLDOWN = 5;
+	private static final double MAX_ALLOWED_VELOCITY = 7.0;
+	private static final double TURN_ALLOWED_VELOCITY = 5.0;
+	private static final long MAX_TICKS_IN_STRAIGHT_LINE = 10;
 
 
 	/**
 	 * Main method with robot behavior.
 	 */
 	public void run() {
-		gps = new ArenaNavigation(enemiesTracking, teammatesTracking, getBattleFieldWidth(), getBattleFieldHeight());
+		setMaxVelocity(MAX_ALLOWED_VELOCITY);
+		int robotNameNumber = Integer.parseInt(String.valueOf(getName().charAt(getName().length()-2)));
+		gps = new ArenaNavigation(enemiesTracking, teammatesTracking, getBattleFieldWidth(), getBattleFieldHeight(), robotNameNumber);
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
 		updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy())); // Register in team
 		lastHeading = getHeading();
@@ -93,6 +90,16 @@ public class Captain extends TeamRobot {
 	 * @param g2d Graphics2D instance from robocode instance
 	 */
 	public void onPaint(Graphics2D g2d) {
+		if (gps != null) {
+			Painter.drawLocation(g2d, Color.green, gps.adjustLocToZone(getCurrentLocation()));
+
+			for (Location loc : gps.getWalls(getCurrentLocation(), true)) {
+				Painter.drawLocation(g2d, Color.ORANGE, loc);
+
+				Vector danger = new Vector(loc, gps.adjustLocToZone(getCurrentLocation())).setLength(95.0);
+				Painter.drawLocation(g2d, Color.red, danger.apply(loc));
+			}
+		}
 	}
 
 	public boolean hasEnemyRadar(String name) {
@@ -159,24 +166,6 @@ public class Captain extends TeamRobot {
 		return new Location(getX(), getY());
 	}
 
-	/**
-	 * Moves robot to desired location
-	 * @param location Destination
-	 */
-	public void goToLocation(Location location) {
-		faceTowards(location);
-		ahead(location.distanceTo(getCurrentLocation()));
-	}
-
-	/**
-	 * Turns robot to desired destination
-	 * @param location Destination
-	 */
-	public void faceTowards(Location location) {
-		double angleOffset = ArenaCalculations.angleRightOffsetToLocation(getHeading(), getCurrentLocation(), location);
-		turnRight(angleOffset);
-	}
-
 	public void updateRobotStatus(TeammateInfo ti) {
 		sendMessageToTeam(new Message(ti));
 		teamStatus.put(getName(), ti);
@@ -184,35 +173,6 @@ public class Captain extends TeamRobot {
 
 	public boolean isRegisteredTeammate(String name) {
 		return teamStatus.values().stream().map(TeammateInfo::getName).anyMatch(teammate -> teammate.equals(name));
-	}
-
-	/**
-	 * Requests teammate to move to location
-	 * @param location Desired location
-	 */
-	public void requestMoveToLocation(Location location, String teammate) {
-		MoveRequest mr = new MoveRequest(location);
-		sendMessageToTeammate(teammate, new Message(mr));
-	}
-
-	/**
-	 * Requests teammate to fire at one location
-	 * @param power Desired power
-	 * @param location Desired location
-	 */
-	public void requestFireToLocation(String teammate, Double power, Location location) {
-		FireRequest fr = new FireRequest(power, location);
-		sendMessageToTeammate(teammate, new Message(fr));
-	}
-
-	/**
-	 * Requests team to fire at one location
-	 * @param power Desired power
-	 * @param location Desired location
-	 */
-	public void requestFireToLocation(Double power, Location location) {
-		FireRequest fr = new FireRequest(power, location);
-		sendMessageToTeam(new Message(fr));
 	}
 
 	/**
@@ -403,17 +363,6 @@ public class Captain extends TeamRobot {
 				setBounty(mostWanted);
 			}
 
-			case FIRE_REQUEST -> {
-				FireRequest fr = message.getFireRequest();
-				faceTowards(fr.getTarget());
-				fireAndBroadcast(fr.getPower());
-			}
-
-			case MOVE_REQUEST -> {
-				MoveRequest mr = message.getMoveRequest();
-				goToLocation(mr.getDestination());
-			}
-
 			case LOCATION_UPDATE -> {
 				Location teammate = message.getLocation();
 				teammatesTracking.put(me.getSender(), teammate);
@@ -452,22 +401,22 @@ public class Captain extends TeamRobot {
 	 * @param e Resulting HitWallEvent instance
 	 */
 	public void onHitWall(HitWallEvent e) {
+		motion = MotionType.HIT_WALL;
+
 		double wallAngle = (getHeading() + e.getBearing() + 360) % 360;
 		double getawayAngle = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getGunHeading(), wallAngle + 90));
 
 		setTurnRight(getawayAngle);
-		setBack(60);
-
-		motion = MotionType.HIT_WALL;
+		setBack(80);
 	}
 
 	public void onHitRobot(HitRobotEvent e) {
 		if (!isRegisteredTeammate(e.getName())) {
+			motion = MotionType.ENEMY_COLLISION;
+
 			double enemyAngle = (getHeading() + e.getBearing() + 360) % 360;
 			double shootingAngle = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getGunHeading(), enemyAngle));
 			setTurnGunRight(ArenaCalculations.shortestAngle(shootingAngle));
-
-			motion = MotionType.ENEMY_COLLISION;
 		}
 	}
 
@@ -548,10 +497,7 @@ public class Captain extends TeamRobot {
 		double headingDiff = ArenaCalculations.shortestAngle(e.getStatus().getHeading() - lastHeading);
 		double acceleration = e.getStatus().getVelocity() - lastVelocity;
 		Vector momentumVector = ArenaCalculations.angleToUnitVector(e.getStatus().getHeading());
-
-		if (motion != MotionType.SPONTANEOUS_SPEED_LIMIT) {
-			setMaxVelocity(Rules.MAX_VELOCITY);
-		}
+		ticksInStraightLine = headingDiff == 0 ? ticksInStraightLine + 1 : 0;
 
 		// Update teammates of current location
 		sendMessageToTeam(new Message(getCurrentLocation()));
@@ -559,132 +505,73 @@ public class Captain extends TeamRobot {
 		// Keep radar spinning
 		setTurnRadarLeft(Rules.RADAR_TURN_RATE);
 
-		// Check if is avoiding bullet
-		if (motion != MotionType.AVOIDING_BULLET) {
-			if (motion != MotionType.AVOIDING_WALL && gps != null && gps.tooCloseToWalls(getCurrentLocation())) {
-				motion = MotionType.AVOIDING_WALL;
-
-				double angleToCenter = ArenaCalculations.angleFromOriginToLocation(getCurrentLocation(),new Location(getBattleFieldWidth()/2.0, getBattleFieldHeight()/2.0));
-				double heading = getHeading();
-				double buttHeading = (heading + 180) % 360;
-
-				double angleDeltaHeadingToCenter = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(heading, angleToCenter));
-				double angleDeltaButtHeadingToCenter = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(buttHeading, angleToCenter));
-
-				if (Math.abs(angleDeltaHeadingToCenter) > Math.abs(angleDeltaButtHeadingToCenter)) {
-					setTurnRight(ArenaCalculations.shortestAngle(buttHeading+180));
-					setAhead(-50);
-				}
-
-				else {
-					setTurnRight(angleDeltaHeadingToCenter);
-					setAhead(50);
-				}
-
-			}
-
-			if (motion == MotionType.ENEMY_COLLISION && getGunTurnRemaining() == 0) {
-				fireAndBroadcast(3);
-				motion = MotionType.READY_TO_MOVE;
-				back(50);
-			}
-
-			if (motion == MotionType.HIT_WALL && getDistanceRemaining() == 0) {
-				motion = MotionType.READY_TO_MOVE;
-			}
-
-			if (motion == MotionType.AVOIDING_WALL && getTurnRemaining() == 0 && getVelocity() == 0) {
-				motion = MotionType.READY_TO_MOVE;
-			}
-
-			if (motion == MotionType.READY_TO_MOVE && gps != null) {
-				destination = gps.getNextDestination(getCurrentLocation());
-				motion = MotionType.MAKING_TURN;
-			}
-
-			// Keep moving to destination
-			if ((motion == MotionType.GOING_TO_DESTINATION || motion == MotionType.MAKING_TURN) && (getCurrentLocation().distanceTo(destination) < 50)) {
-				motion = MotionType.READY_TO_MOVE;
-			}
-
-			// Deal with spontaneous actions that introduce variable behavior
-			if (motion == MotionType.SPONTANEOUS_TURN && getTurnRemaining() == 0) {
-				motion = MotionType.READY_TO_MOVE;
-				lastSpontaneousAction = e.getTime();
-			}
-
-			else if (motion == MotionType.SPONTANEOUS_SPEED_LIMIT && getVelocity() == lastVelocity) {
-				motion = MotionType.GOING_TO_DESTINATION;
-				setMaxVelocity(Rules.MAX_VELOCITY);
-				lastSpontaneousAction = e.getTime();
-
-			}
-
-			else if (motion == MotionType.SPONTANEOUS_REVERSE && getDistanceRemaining() == 0) {
-				motion = MotionType.GOING_TO_DESTINATION;
-				lastSpontaneousAction = e.getTime();
-
-			}
-
-			if ((motion == MotionType.GOING_TO_DESTINATION) && (getTurnRemaining() == 0)) {
-				setMaxVelocity(Rules.MAX_VELOCITY);
-				setAhead(getCurrentLocation().distanceTo(destination));
-
-				if (e.getTime() - lastSpontaneousAction >= SPONTANEOUS_ACTION_COOLDOWN) {
-					if (ThreadLocalRandom.current().nextDouble() <= PROBABILITY_OF_SPONTANEOUS_TURN) {
-						double turnAngle = ThreadLocalRandom.current().nextDouble(-90, 90);
-						setTurnRight(turnAngle);
-						motion = MotionType.SPONTANEOUS_TURN;
-
-					} else if (ThreadLocalRandom.current().nextDouble() <= PROBABILITY_OF_SPONTANEOUS_SPEED_LIMITATION) {
-						double speedLimit = ThreadLocalRandom.current().nextDouble(0, 5);
-						setMaxVelocity(speedLimit);
-						motion = MotionType.SPONTANEOUS_SPEED_LIMIT;
-
-					} else if (ThreadLocalRandom.current().nextDouble() <= PROBABILITY_OF_SPONTANEOUS_REVERSING) {
-						double reverseDistance = ThreadLocalRandom.current().nextDouble(50, 100);
-						setAhead(-reverseDistance);
-						motion = MotionType.SPONTANEOUS_REVERSE;
-
-					}
-				}
-			}
-
-			if (motion == MotionType.MAKING_TURN) {
-				makeTurnMax++;
-				if (gps.tooCloseToRobots(getCurrentLocation()) || makeTurnMax > 20) {
-					back(15);
-					motion = MotionType.READY_TO_MOVE;
-					makeTurnMax = 0;
-				}
-
-				else {
-					double nextVelocity = acceleration > 0 ? Math.min(e.getStatus().getVelocity() + acceleration, Rules.MAX_VELOCITY) : Math.max(e.getStatus().getVelocity() + acceleration, 0);
-					double maxTurn = Rules.MAX_TURN_RATE - (0.75 * nextVelocity);
-
-					double currentAngleToDestination = ArenaCalculations.angleFromOriginToLocation(getCurrentLocation(), destination);
-					double angleDelta = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getHeading(), currentAngleToDestination));
-
-					if (Math.abs(angleDelta) > maxTurn) {
-						setMaxVelocity(6.5);
-						angleDelta = angleDelta > 0 ? maxTurn : -maxTurn;
-					} else {
-						motion = MotionType.GOING_TO_DESTINATION;
-					}
-
-					setTurnRight(angleDelta);
-					setAhead(50);
-				}
-			}
-
-			else {
-				makeTurnMax = 0;
-			}
+		// Movement calculations
+		if (PRIORITY_MOTIONS.contains(motion) && e.getStatus().getDistanceRemaining() < 5) {
+			motion = MotionType.MOVING;
 		}
 
-		else {
-			if ((Math.abs(getTurnRemaining()) < 1 ) && (Math.abs(getDistanceRemaining()) < 1)) {
-				motion = MotionType.READY_TO_MOVE;
+		// Handle movement if priority task is not happening
+		if (gps != null & !PRIORITY_MOTIONS.contains(motion)) {
+			// TODO Check proximity to teammates
+
+			// If is going in straight line for too long
+			if (ticksInStraightLine > MAX_TICKS_IN_STRAIGHT_LINE && gps.isInsideOfZone(getCurrentLocation())) {
+				motion = MotionType.RANDOM_DIVERSION;
+				ticksInStraightLine = 0;
+
+				targetHeading = (e.getStatus().getHeading() + 90*(ThreadLocalRandom.current().nextDouble() > 0.5 ? 1 : -1)) % 360;
+			}
+
+			// Ready to start motion
+			if (motion == MotionType.READY_TO_MOVE) {
+				if (gps.isInsideOfZone(getCurrentLocation())) {
+					motion = MotionType.MOVING;
+					setAhead(50);
+				}
+				else {
+					motion = MotionType.TURNING;
+					Location centerOfZone = gps.getCenterOfZone();
+					targetHeading = ArenaCalculations.angleFromOriginToLocation(getCurrentLocation(), centerOfZone);
+				}
+			}
+
+			// Check if is close to walls
+			if (motion != MotionType.TURNING) {
+				Double newHeading = gps.getTargetHeading(getCurrentLocation());
+				if (Objects.nonNull(newHeading)) {
+					motion = MotionType.TURNING;
+					targetHeading = newHeading;
+				}
+			}
+
+			// Just keep going until other action is triggered
+			if (motion == MotionType.MOVING) {
+				// Check if inside zone or moving towards it
+				if (!gps.isInsideOfZone(getCurrentLocation()) && !gps.isHeadingTowardsZone(getCurrentLocation(), e.getStatus().getHeading())) {
+					motion = MotionType.TURNING;
+					Location centerOfZone = gps.getCenterOfZone();
+					targetHeading = ArenaCalculations.angleFromOriginToLocation(getCurrentLocation(), centerOfZone);
+				}
+				setAhead(50);
+			}
+
+			// Handle turning to target heading
+			if (motion == MotionType.TURNING || motion == MotionType.RANDOM_DIVERSION) {
+				setMaxVelocity(TURN_ALLOWED_VELOCITY);
+				double nextVelocity = acceleration > 0 ? Math.min(e.getStatus().getVelocity() + acceleration, Rules.MAX_VELOCITY) : Math.max(e.getStatus().getVelocity() + acceleration, 0);
+				double maxTurn = Rules.MAX_TURN_RATE - (0.75 * nextVelocity);
+
+				double angleDelta = ArenaCalculations.shortestAngle(ArenaCalculations.angleDeltaRight(getHeading(), targetHeading));
+
+				if (Math.abs(angleDelta) > maxTurn) {
+					angleDelta = angleDelta > 0 ? maxTurn : -maxTurn;
+				} else {
+					motion = MotionType.MOVING;
+					setMaxVelocity(MAX_ALLOWED_VELOCITY);
+				}
+
+				setTurnRight(angleDelta);
+				setAhead(50);
 			}
 		}
 
@@ -732,12 +619,11 @@ public class Captain extends TeamRobot {
 				// Get new tracker
 				cleanGun();
 			}
-
 		}
 
 		if (readyToFire && getGunTurnRemaining() == 0) {
 			double power = calculateBulletPower(getCurrentLocation(), target);
-			fireAndBroadcast(power);
+			//TODO REMOVE fireAndBroadcast(power);
 			cleanGun();
 		}
 
@@ -774,7 +660,6 @@ public class Captain extends TeamRobot {
 				if (nextBulletLocation != null && ArenaCalculations.isLocationInsideRobot(nextRobotLocation, e.getStatus().getHeading(), nextBulletLocation, ROBOT_EDGES_DISTANCE_TOLERANCE)) {
 					// Robot is in a collision course, calculate in which direction to go
 					motion = MotionType.AVOIDING_BULLET;
-					setMaxVelocity(Rules.MAX_VELOCITY);
 
 					Vector bulletVector = bi.getBulletVector();
 					Vector robotVector = ArenaCalculations.angleToUnitVector(e.getStatus().getHeading());
