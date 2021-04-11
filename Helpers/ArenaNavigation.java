@@ -1,17 +1,21 @@
 package sa_robocode.Helpers;
 
+import sa_robocode.Communication.TeammateInfo;
+import sa_robocode.robots.RobotType;
+
 import java.awt.geom.Path2D;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class ArenaNavigation {
-    private static final Double MIN_DISTANCE_TO_WALLS = 95.0;
+    public static final Double MIN_DISTANCE_TO_WALLS = 95.0;
+    private static final Double MIN_DISTANCE_TO_TEAMMATE = 80.0;
 
-    private final Map<String, Tracker> enemiesTracking;
     private final Map<String, Location> teammatesTracking;
+    private final Map<String, TeammateInfo> teamStatus;
     private final double arenaWidth;
     private final double arenaHeight;
-    private final Zone zone;
+    private Zone zone;
 
     private enum Zone {
         QUADRANT_0, // BOTTOM LEFT
@@ -21,12 +25,45 @@ public class ArenaNavigation {
         FULL_ARENA
     }
 
-    public ArenaNavigation(Map<String, Tracker> enemiesTracking, Map<String, Location> teammatesTracking, double arenaWidth, double arenaHeight, int number) {
-        this.enemiesTracking = enemiesTracking;
+    public ArenaNavigation(Map<String, Location> teammatesTracking, Map<String, TeammateInfo> teamStatus, double arenaWidth, double arenaHeight, String name) {
         this.teammatesTracking = teammatesTracking;
+        this.teamStatus = teamStatus;
         this.arenaWidth = arenaWidth;
         this.arenaHeight = arenaHeight;
-        this.zone = Zone.values()[number % 5];
+        this.zone = getZoneFromName(name);
+    }
+
+    public void updateZone(String deadTeammate) {
+        boolean anyCaptains = teamStatus.values().stream().anyMatch(a -> a.getRobotType() == RobotType.CAPTAIN);
+
+        if (anyCaptains) {
+            if (zone == Zone.FULL_ARENA) {
+                zone = getZoneFromName(deadTeammate);
+            }
+        }
+
+        else {
+            zone = Zone.FULL_ARENA;
+        }
+    }
+
+    public Zone getZoneFromName(String name) {
+        int number = Integer.parseInt(String.valueOf(name.charAt(name.length()-2)));
+        return Zone.values()[number % 5];
+    }
+
+    public Location tooCloseToTeammate(Location robot) {
+        for (Location teammate: teammatesTracking.values()) {
+            if (teammate.distanceTo(robot) < MIN_DISTANCE_TO_TEAMMATE) {
+                return teammate;
+            }
+        }
+
+        return null;
+    }
+
+    public boolean zoneIsFullArena() {
+        return zone == Zone.FULL_ARENA;
     }
 
     public Location adjustLocToZone(Location original) {
@@ -41,7 +78,7 @@ public class ArenaNavigation {
         return adjusted;
     }
 
-    public List<Location> getWalls(Location location, boolean zoneAdjusted) {
+    public List<Location> getWallsOrderedByDistance(Location location, boolean zoneAdjusted) {
         Location adjustedLocation = zoneAdjusted ? adjustLocToZone(location) : location;
         int adjustWalls = zoneAdjusted && (zone != Zone.FULL_ARENA) ? 2 : 1;
 
@@ -50,6 +87,7 @@ public class ArenaNavigation {
         walls.add(new Location(adjustedLocation.getX(), 0.0));
         walls.add(new Location(0.0, adjustedLocation.getY()));
         walls.add(new Location(arenaWidth/adjustWalls, adjustedLocation.getY()));
+        walls.sort(Comparator.comparingDouble(o -> o.distanceTo(adjustedLocation)));
 
         return walls;
     }
@@ -83,8 +121,7 @@ public class ArenaNavigation {
         }
 
         Location adjustedRobot = adjustLocToZone(robot);
-        List<Location> walls = getWalls(robot, true);
-        walls.sort(Comparator.comparingDouble(o -> o.distanceTo(adjustedRobot)));
+        List<Location> walls = getWallsOrderedByDistance(robot, true);
 
         if (walls.get(0).distanceTo(adjustedRobot) < MIN_DISTANCE_TO_WALLS) {
             if (walls.get(1).distanceTo(adjustedRobot) < MIN_DISTANCE_TO_WALLS * 1.4) {

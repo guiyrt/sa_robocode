@@ -1,6 +1,5 @@
 package sa_robocode.Communication;
 
-
 import sa_robocode.Helpers.Location;
 import sa_robocode.Helpers.Tracker;
 
@@ -14,8 +13,6 @@ public class Message implements Serializable {
     private final MessageType messageType;
     private final BulletInfo bulletInfo;
     private final ScanInfo scanInfo;
-    private final FireRequest fireRequest;
-    private final MoveRequest moveRequest;
     private final TeammateInfo teammateInfo;
     private final Set<Tracker> bounties;
     private final Location location;
@@ -28,8 +25,6 @@ public class Message implements Serializable {
         this.messageType = messageType;
         this.bulletInfo = null;
         this.scanInfo = null;
-        this.fireRequest = null;
-        this.moveRequest = null;
         this.teammateInfo = null;
         this.bounties = null;
         this.location = null;
@@ -43,8 +38,6 @@ public class Message implements Serializable {
         this.messageType = MessageType.BULLET_INFO;
         this.bulletInfo = bulletInfo;
         this.scanInfo = null;
-        this.fireRequest = null;
-        this.moveRequest = null;
         this.teammateInfo = null;
         this.bounties = null;
         this.location = null;
@@ -58,42 +51,11 @@ public class Message implements Serializable {
         this.messageType = MessageType.SCAN_INFO;
         this.scanInfo = scanInfo;
         this.bulletInfo = null;
-        this.fireRequest = null;
-        this.moveRequest = null;
         this.teammateInfo = null;
         this.bounties = null;
         this.location = null;
     }
 
-    /**
-     * Creates instance of Message with FireRequest
-     * @param fireRequest FireRequest instance
-     */
-    public Message(FireRequest fireRequest) {
-        this.messageType = MessageType.FIRE_REQUEST;
-        this.fireRequest = fireRequest;
-        this.bulletInfo = null;
-        this.scanInfo = null;
-        this.moveRequest = null;
-        this.teammateInfo = null;
-        this.bounties = null;
-        this.location = null;
-    }
-
-    /**
-     * Creates instance of Message with MoveRequest
-     * @param moveRequest MoveRequest instance
-     */
-    public Message(MoveRequest moveRequest) {
-        this.messageType = MessageType.MOVE_REQUEST;
-        this.moveRequest = moveRequest;
-        this.bulletInfo = null;
-        this.scanInfo = null;
-        this.fireRequest = null;
-        this.teammateInfo = null;
-        this.bounties = null;
-        this.location = null;
-    }
 
     /**
      * Creates instance of Message with a information String
@@ -102,10 +64,8 @@ public class Message implements Serializable {
     public Message(TeammateInfo teammateInfo) {
         this.messageType = MessageType.TEAMMATE_REGISTER;
         this.teammateInfo = teammateInfo;
-        this.moveRequest = null;
         this.bulletInfo = null;
         this.scanInfo = null;
-        this.fireRequest = null;
         this.bounties = null;
         this.location = null;
     }
@@ -114,10 +74,8 @@ public class Message implements Serializable {
         this.messageType = MessageType.BOUNTIES_INFO;
         this.bounties = bounties;
         this.teammateInfo = null;
-        this.moveRequest = null;
         this.bulletInfo = null;
         this.scanInfo = null;
-        this.fireRequest = null;
         this.location = null;
     }
 
@@ -126,10 +84,8 @@ public class Message implements Serializable {
         this.messageType = MessageType.LOCATION_UPDATE;
         this.location = location;
         this.bounties = null;
-        this.moveRequest = null;
         this.bulletInfo = null;
         this.scanInfo = null;
-        this.fireRequest = null;
         this.teammateInfo = null;
     }
 
@@ -157,24 +113,6 @@ public class Message implements Serializable {
      */
     public ScanInfo getScanInfo() {
         return scanInfo;
-    }
-
-    /**
-     * Gets information regarding fireRequest
-     * Could be null, if messageType is not meant for this information transmission
-     * @return FireRequest from message
-     */
-    public FireRequest getFireRequest() {
-        return fireRequest;
-    }
-
-    /**
-     * Gets information regarding moveRequest
-     * Could be null, if messageType is not meant for this information transmission
-     * @return MoveRequest from message
-     */
-    public MoveRequest getMoveRequest() {
-        return moveRequest;
     }
 
     /**

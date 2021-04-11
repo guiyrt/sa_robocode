@@ -7,9 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Tracker implements Serializable {
-    private static final int MAX_PINGS = 50;
+    private static final int MAX_PINGS = 40;
     private static final int DUCK_THRESHOLD = 3;
-    private static final int CRAB_THRESHOLD = 10;
+    private static final int CRAB_THRESHOLD = 50;
     private static final int SHARK_THRESHOLD = 6;
     private static final int PROJECTION_MAX_MISSING_DATA_POINTS = 4;
 
@@ -71,7 +71,7 @@ public class Tracker implements Serializable {
         resetPatterns();
 
         Location duck = PatternFinder.patternSittingDuck(pings, DUCK_THRESHOLD);
-        Line crab = null;//TODO: CRAB IS BUGGY, DO NOT UNCOMMENT PatternFinder.patternCrab(pings, CRAB_THRESHOLD);
+        Line crab = PatternFinder.patternCrab(pings, CRAB_THRESHOLD);
         Circle shark = PatternFinder.patternShark(pings, SHARK_THRESHOLD);
         Projection projection = PatternFinder.patternProjection(pings, PROJECTION_MAX_MISSING_DATA_POINTS);
 
@@ -101,21 +101,14 @@ public class Tracker implements Serializable {
         double heading = 0.0;
 
         switch (trackerType) {
-            case PROJECTION -> {
-                heading = projection.getHeading(tick);
-            }
+            case PROJECTION -> heading = projection.getHeading(tick);
 
-            case DUCK, LINEAR -> {
-                heading = pings.get(0).getScannedRobotEvent().getHeading();
-            }
 
-            case CRAB -> {
-                heading = line.getHeading();
-            }
+            case DUCK, LINEAR -> heading = pings.get(0).getScannedRobotEvent().getHeading();
 
-            case SHARK -> {
-                heading = circle.getHeading(pings.get(0), tick, pings.get(0).getScannedRobotEvent().getVelocity());
-            }
+            case CRAB -> heading = line.getHeading();
+
+            case SHARK -> heading = circle.getHeading(pings.get(0), tick, pings.get(0).getScannedRobotEvent().getVelocity());
         }
 
         return heading;
@@ -131,9 +124,7 @@ public class Tracker implements Serializable {
         }
 
         switch (trackerType) {
-            case DUCK -> {
-                future = stopped;
-            }
+            case DUCK -> future = stopped;
 
             case CRAB -> {
                 double orientationSensitiveVelocity =  Line.getVelocityOrientation(pings.get(0).getLocation(), pings.get(1).getLocation(), lastKnown.getScannedRobotEvent().getVelocity());
@@ -145,15 +136,12 @@ public class Tracker implements Serializable {
                 future = circle.getLocationByTick(lastKnown, tick, orientationSensitiveVelocity);
             }
 
-            case PROJECTION -> {
-                future = projection.getLocationByTick(tick);
-            }
+            case PROJECTION -> future = projection.getLocationByTick(tick);
 
-            case LINEAR -> {
-                future = ArenaCalculations.angleToUnitVector(lastKnown.getScannedRobotEvent().getHeading()).
+            case LINEAR -> future = ArenaCalculations.angleToUnitVector(lastKnown.getScannedRobotEvent().getHeading()).
                         setLength(lastKnown.getScannedRobotEvent().getVelocity() * (tick - lastKnown.getScannedRobotEvent().getTime())).
                         apply(lastKnown.getLocation());
-            }
+
         }
 
         return future;
