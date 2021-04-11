@@ -78,7 +78,7 @@ public class Captain extends TeamRobot {
 		setMaxVelocity(MAX_ALLOWED_VELOCITY);
 		gps = new ArenaNavigation(teammatesTracking, teamStatus, getBattleFieldWidth(), getBattleFieldHeight(), getName());
 		setColors(ARMY_GREEN, ARMY_DARK_GREEN, RADAR_RED, COPPER_BULLET, BEAM_BLUE); // Set tank colors
-		updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy())); // Register in team
+		updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy()), MessageType.TEAMMATE_REGISTER); // Register in team
 		lastHeading = getHeading();
 		lastVelocity = getVelocity();
 		currentLeader = getName();
@@ -167,8 +167,8 @@ public class Captain extends TeamRobot {
 		return new Location(getX(), getY());
 	}
 
-	public void updateRobotStatus(TeammateInfo ti) {
-		sendMessageToTeam(new Message(ti));
+	public void updateRobotStatus(TeammateInfo ti, MessageType messageType) {
+		sendMessageToTeam(new Message(ti, messageType));
 		teamStatus.put(getName(), ti);
 	}
 
@@ -198,23 +198,16 @@ public class Captain extends TeamRobot {
 
 		String name = si.getScannedRobotEvent().getName();
 
-		// No use for information about itself
-		if (name.equals(getName())) {
-			return;
+		// Check if enemy was already detected before
+		if (!enemiesTracking.containsKey(name)) {
+			enemiesTracking.put(name, new Tracker(name));
+
+			// Check if first scan of enemy has over 100 energy points, because droids have 120
+			enemyDroids.put(name, si.getScannedRobotEvent().getEnergy() > 100);
 		}
 
-		if (!isRegisteredTeammate(name)) {
-			// Check if enemy was already detected before
-			if (!enemiesTracking.containsKey(name)) {
-				enemiesTracking.put(name, new Tracker(name));
-
-				// Check if first scan of enemy has over 100 energy points, because droids have 120
-				enemyDroids.put(name, si.getScannedRobotEvent().getEnergy() > 100);
-			}
-
-			// Add last tracked location to head of list
-			enemiesTracking.get(name).addPing(si);
-		}
+		// Add last tracked location to head of list
+		enemiesTracking.get(name).addPing(si);
 	}
 
 	public void checkHierarchy() {
@@ -385,11 +378,13 @@ public class Captain extends TeamRobot {
 	 * @param sre Resulting ScannedRobotEvent instance
 	 */
 	public void onScannedRobot(ScannedRobotEvent sre) {
-		Location detectedRobotLocation = getRobotLocationFromScanEvent(sre);
-		ScanInfo si = new ScanInfo(detectedRobotLocation, sre);
+		if (!isRegisteredTeammate(sre.getName())) {
+			Location detectedRobotLocation = getRobotLocationFromScanEvent(sre);
+			ScanInfo si = new ScanInfo(detectedRobotLocation, sre);
 
-		sendMessageToTeam(new Message(si));
-		processScanInfo(si);
+			sendMessageToTeam(new Message(si));
+			processScanInfo(si);
+		}
 	}
 
 	public void goPerpendicularToVectorDirection(Vector target, double heading, Vector preferredDirection) {
@@ -451,7 +446,7 @@ public class Captain extends TeamRobot {
 			// Might be necessary a new leader election
 			if (name.equals(currentLeader)) {
 				if (teamStatus.keySet().size() > 1) {
-					updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy()));
+					updateRobotStatus(new TeammateInfo(getName(), robotType, getEnergy()), MessageType.STATUS_INFO);
 				}
 
 				// Out of teammates

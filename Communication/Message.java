@@ -61,8 +61,8 @@ public class Message implements Serializable {
      * Creates instance of Message with a information String
      * @param teammateInfo TeammateInfo instance
      */
-    public Message(TeammateInfo teammateInfo) {
-        this.messageType = MessageType.TEAMMATE_REGISTER;
+    public Message(TeammateInfo teammateInfo, MessageType messageType) {
+        this.messageType = messageType;
         this.teammateInfo = teammateInfo;
         this.bulletInfo = null;
         this.scanInfo = null;
