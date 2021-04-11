@@ -1,7 +1,7 @@
 #Robocode Robot Team
 #Sun Mar 21 23:57:32 WET 2021
 team.author.name=
-team.version=1
+team.version=2
 team.members=sa_robocode.robots.Captain*,sa_robocode.robots.Captain*,sa_robocode.robots.Captain*,sa_robocode.robots.Droid*,sa_robocode.robots.Droid*
 team.description=SI - SA
 robocode.version=1.9.3.9
